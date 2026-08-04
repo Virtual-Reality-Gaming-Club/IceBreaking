@@ -360,7 +360,7 @@ export default function UserPanelPage() {
   }, [polls.length, activeQuizQuestions.length]);
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#060812] text-slate-100 font-sans overflow-x-hidden">
+    <div className="relative min-h-screen flex flex-col bg-transparent text-slate-100 font-sans overflow-x-hidden">
 
       <PublicNavbar />
 

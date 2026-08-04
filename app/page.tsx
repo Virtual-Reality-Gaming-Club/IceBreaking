@@ -36,7 +36,7 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#05070e] text-slate-100 overflow-x-hidden">
+    <div className="relative min-h-screen flex flex-col bg-transparent text-slate-100 overflow-x-hidden">
       <PublicNavbar />
 
       {/* Main Container */}
