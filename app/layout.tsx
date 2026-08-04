@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
-import { ToastProvider } from "@/contexts/ToastContext";
-import { AudioProvider } from "@/contexts/AudioContext";
-import { EVENT_CONFIG } from "@/config/event";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,17 +21,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: `${EVENT_CONFIG.name} · ${EVENT_CONFIG.clubName}`,
-  description: EVENT_CONFIG.defaultDescription,
-  keywords: [
-    EVENT_CONFIG.clubName,
-    EVENT_CONFIG.name,
-    "VIT Bhopal",
-    "Leaderboard",
-    "Gaming Club",
-    "Live Events",
-  ],
-  authors: [{ name: `${EVENT_CONFIG.clubName} Tech Team` }],
+  title: "IceBreaking",
+  description: "Event Landing Page",
   icons: {
     icon: "/logo.png",
     shortcut: "/logo.png",
@@ -50,11 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
       <body className="antialiased">
-        <AudioProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </AudioProvider>
+        {children}
       </body>
     </html>
   );
