@@ -7,7 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, doc } from "firebase/firestore";
 import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -146,57 +146,77 @@ export default function AdminDashboardPage() {
     return () => unsubscribe();
   }, [router]);
 
-  const fetchDashboardData = async () => {
-    try {
-      // 1. Fetch Participants from Firestore 'participants' collection
-      const participantsSnap = await getDocs(collection(db, "participants"));
+  // Real-time Dashboard Data Listeners
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    // 1. Participants Realtime
+    const unsubParticipants = onSnapshot(collection(db, "participants"), (snap) => {
       const participantsData: ParticipantItem[] = [];
-      participantsSnap.forEach((docSnap) => {
-        participantsData.push({ id: docSnap.id, ...docSnap.data() } as ParticipantItem);
-      });
+      snap.forEach((d) => participantsData.push({ id: d.id, ...d.data() } as ParticipantItem));
       setParticipantsList(participantsData);
+      setStats(s => ({ ...s, totalUsers: snap.size }));
+    });
 
-      // 2. Fetch Events from 'events' collection bucket
-      fetchEvents();
+    // 2. Events Realtime
+    const unsubEvents = onSnapshot(collection(db, "events"), (snap) => {
+      const eventsData: EventItem[] = [];
+      snap.forEach((d) => eventsData.push({ id: d.id, ...d.data() } as EventItem));
+      setEventsList(eventsData);
+      setStats(s => ({ ...s, totalEvents: snap.size }));
+    });
 
-      // 3. Fetch Admins
-      const adminsData = await getAllAdmins();
-      setAdminsList(adminsData);
+    // 3. Polls Realtime
+    const unsubPolls = onSnapshot(collection(db, "polls"), (snap) => {
+      const pollsData: any[] = [];
+      snap.forEach((d) => pollsData.push({ id: d.id, ...d.data() }));
+      setPollsList(pollsData);
+    });
 
-      // 4. Fetch Leaderboard / Teams count
-      const leaderboardSnap = await getDocs(collection(db, "leaderboard"));
+    // 4. Quizzes Realtime
+    const unsubQuizzes = onSnapshot(collection(db, "quizzes"), (snap) => {
+      const quizzesData: any[] = [];
+      snap.forEach((d) => quizzesData.push({ id: d.id, ...d.data() }));
+      setQuizzesList(quizzesData);
+    });
 
-      // 5. Fetch Polls & Quizzes & Registration Status
-      fetchPolls();
-      fetchQuizzes();
-      fetchRegistrationStatus();
-
-      const eventsSnap = await getDocs(collection(db, "events"));
-
-      setStats({
-        totalUsers: participantsSnap.size,
-        totalEvents: eventsSnap.size,
-        activeAdmins: adminsData.length > 0 ? adminsData.length : 2,
-        totalTeams: leaderboardSnap.size,
-      });
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err);
-    }
-  };
-
-  const fetchRegistrationStatus = async () => {
-    try {
-      const { doc, getDoc } = await import("firebase/firestore");
-      const configSnap = await getDoc(doc(db, "settings", "registration"));
-      if (configSnap.exists()) {
-        setRegistrationOpen(Boolean(configSnap.data()?.isOpen));
+    // 5. Registration Settings Realtime
+    const unsubRegistration = onSnapshot(doc(db, "settings", "registration"), (docSnap) => {
+      if (docSnap.exists()) {
+        setRegistrationOpen(Boolean(docSnap.data()?.isOpen));
       } else {
         setRegistrationOpen(true);
       }
-    } catch (err) {
-      console.error("Error fetching registration status:", err);
-    }
-  };
+    });
+
+    // 6. Leaderboard Teams
+    const unsubLeaderboard = onSnapshot(collection(db, "leaderboard"), (snap) => {
+      setStats(s => ({ ...s, totalTeams: snap.size }));
+    });
+    
+    // Admins
+    getAllAdmins().then(admins => {
+      setAdminsList(admins);
+      setStats(s => ({ ...s, activeAdmins: admins.length > 0 ? admins.length : 2 }));
+    });
+
+    return () => {
+      unsubParticipants();
+      unsubEvents();
+      unsubPolls();
+      unsubQuizzes();
+      unsubRegistration();
+      unsubLeaderboard();
+    };
+  }, [isAdmin]);
+
+  // Keep these as empty functions to prevent crashes from legacy manual refresh calls
+  const fetchDashboardData = async () => {};
+
+  const fetchRegistrationStatus = async () => {};
+  const fetchEvents = async () => {};
+  const fetchPolls = async () => {};
+  const fetchQuizzes = async () => {};
 
   const handleToggleRegistration = async () => {
     try {
@@ -206,53 +226,9 @@ export default function AdminDashboardPage() {
         isOpen: nextState,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
-      setRegistrationOpen(nextState);
     } catch (err) {
       console.error("Error toggling registration status:", err);
       alert("Failed to update registration status.");
-    }
-  };
-
-
-
-  const fetchEvents = async () => {
-    try {
-      const eventsSnap = await getDocs(collection(db, "events"));
-      const events: EventItem[] = [];
-      eventsSnap.forEach((docSnap) => {
-        events.push({ id: docSnap.id, ...docSnap.data() } as EventItem);
-      });
-      setEventsList(events);
-    } catch (err) {
-      console.error("Error fetching events:", err);
-    }
-  };
-
-
-
-  const fetchPolls = async () => {
-    try {
-      const pollsSnap = await getDocs(collection(db, "polls"));
-      const polls: any[] = [];
-      pollsSnap.forEach((docSnap) => {
-        polls.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setPollsList(polls);
-    } catch (err) {
-      console.error("Error fetching polls:", err);
-    }
-  };
-
-  const fetchQuizzes = async () => {
-    try {
-      const quizzesSnap = await getDocs(collection(db, "quizzes"));
-      const quizzes: any[] = [];
-      quizzesSnap.forEach((docSnap) => {
-        quizzes.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      setQuizzesList(quizzes);
-    } catch (err) {
-      console.error("Error fetching quizzes:", err);
     }
   };
 
@@ -1240,19 +1216,50 @@ export default function AdminDashboardPage() {
                           </div>
                         </div>
 
-                        {/* Poll Options Breakdown */}
-                        <div style={{ display: "grid", gap: "12px", marginTop: "18px" }}>
+                        {/* Animated & Colorful Bar Graph Results */}
+                        <div className="space-y-3.5 mt-5 pt-4 border-t border-white/[0.08]">
+                          <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            <span>Option Response breakdown</span>
+                            <span className="text-violet-400">Total: {totalVotes} votes</span>
+                          </div>
+
                           {poll.options?.map((opt: any, idx: number) => {
                             const votes = opt.votes || 0;
                             const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+                            
+                            // Distinct vibrant gradient palette for each option bar
+                            const barGradients = [
+                              "from-violet-600 via-indigo-500 to-cyan-400 shadow-[0_0_15px_rgba(139,92,246,0.4)]",
+                              "from-pink-500 via-rose-500 to-amber-400 shadow-[0_0_15px_rgba(244,63,94,0.4)]",
+                              "from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]",
+                              "from-amber-400 via-orange-500 to-red-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]",
+                              "from-purple-500 via-fuchsia-500 to-pink-400 shadow-[0_0_15px_rgba(217,70,239,0.4)]",
+                            ];
+                            const currentGradient = barGradients[idx % barGradients.length];
+
                             return (
-                              <div key={idx} className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80">
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", fontWeight: 700, marginBottom: "8px", color: "#f1f5f9" }}>
-                                  <span>{opt.text}</span>
-                                  <span style={{ color: "#c4b5fd" }}>{votes} votes ({percentage}%)</span>
+                              <div key={idx} className="bg-slate-900/80 p-3.5 rounded-2xl border border-white/[0.08] relative overflow-hidden backdrop-blur-md">
+                                <div className="flex justify-between items-center text-xs sm:text-sm font-bold mb-2 z-10 relative">
+                                  <span className="text-white flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center font-black text-[10px] text-violet-300">
+                                      {String.fromCharCode(65 + idx)}
+                                    </span>
+                                    <span>{opt.text}</span>
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 text-xs font-semibold">{votes} votes</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-violet-200 font-extrabold text-xs border border-white/10">
+                                      {percentage}%
+                                    </span>
+                                  </div>
                                 </div>
-                                <div style={{ height: "8px", background: "rgba(15, 23, 42, 0.8)", borderRadius: "6px", overflow: "hidden", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                                  <div style={{ height: "100%", width: `${percentage}%`, background: "linear-gradient(90deg, #7c3aed, #3b82f6)", borderRadius: "6px", transition: "width 0.5s ease" }} />
+
+                                {/* Dynamic Animated Bar Graph */}
+                                <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden p-0.5 border border-white/[0.06] relative">
+                                  <div
+                                    className={`h-full bg-gradient-to-r ${currentGradient} rounded-full transition-all duration-1000 ease-out`}
+                                    style={{ width: `${percentage}%` }}
+                                  />
                                 </div>
                               </div>
                             );

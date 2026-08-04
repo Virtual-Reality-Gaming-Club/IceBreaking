@@ -82,13 +82,10 @@ export default function HomePage() {
                 </button>
               </Link>
             ) : (
-              <Link href="/register">
-                <button className="group relative px-7 py-3 rounded-2xl bg-white/5 border border-violet-400/50 font-bold text-base backdrop-blur-xl hover:bg-violet-500/15 hover:border-violet-400 transition-all duration-300 flex items-center gap-2.5 cursor-pointer shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:shadow-[0_0_32px_rgba(139,92,246,0.65)]">
-                  <Zap size={17} className="text-yellow-400 group-hover:text-yellow-300 transition-colors" />
-                  <AuroraText>Register Now</AuroraText>
-                  <ChevronRight size={15} className="text-violet-400 group-hover:translate-x-0.5 group-hover:text-white transition-all" />
-                </button>
-              </Link>
+              <button disabled className="group relative px-7 py-3 rounded-2xl bg-slate-900/40 border border-red-500/30 font-bold text-base backdrop-blur-xl opacity-60 cursor-not-allowed flex items-center gap-2.5 shadow-[0_0_15px_rgba(239,68,68,0.15)]">
+                <div className="text-red-400">🔒</div>
+                <span className="text-red-300">Registration Closed</span>
+              </button>
             )}
           </div>
         </section>

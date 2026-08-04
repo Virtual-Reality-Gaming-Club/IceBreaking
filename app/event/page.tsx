@@ -142,7 +142,6 @@ export default function UserPanelPage() {
       const raw: PollItem[] = [];
       snapshot.docs.forEach((d) => {
         const data = d.data();
-        // Only include if status is explicitly active or open
         if (data.status === "active" || data.status === "open") {
           raw.push({ id: d.id, ...data } as PollItem);
         }
@@ -517,28 +516,44 @@ export default function UserPanelPage() {
                                 <h3 className="text-lg font-black text-white mb-5 leading-snug">{poll.question}</h3>
 
                                 {hasVoted ? (
-                                  <div className="space-y-3">
-                                    {poll.options.map((opt, optIdx) => {
-                                      const count = opt.votes || 0;
-                                      const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-                                      const isMyChoice = userVotedOptionId === opt.id;
-                                      return (
-                                        <div key={opt.id || optIdx} className={`p-4 rounded-2xl border transition-all ${isMyChoice ? "bg-violet-950/40 border-violet-500/60 shadow-lg shadow-violet-950/40" : "bg-slate-950/60 border-slate-800/80"}`}>
-                                          <div className="flex justify-between items-center text-sm font-semibold mb-2">
-                                            <span className="text-white flex items-center gap-2">
-                                              {opt.text}
-                                              {isMyChoice && <span className="text-xs text-violet-300 font-bold">(Your Choice)</span>}
-                                            </span>
-                                            <span className="text-sky-400 font-extrabold">{pct}%</span>
+                                    <div className="space-y-3 mt-4 pt-3 border-t border-white/[0.08]">
+                                      {poll.options.map((opt, optIdx) => {
+                                        const count = opt.votes || 0;
+                                        const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                                        const isMyChoice = userVotedOptionId === opt.id;
+                                        
+                                        const barGradients = [
+                                          "from-violet-600 via-indigo-500 to-cyan-400 shadow-[0_0_15px_rgba(139,92,246,0.4)]",
+                                          "from-pink-500 via-rose-500 to-amber-400 shadow-[0_0_15px_rgba(244,63,94,0.4)]",
+                                          "from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]",
+                                          "from-amber-400 via-orange-500 to-red-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]",
+                                          "from-purple-500 via-fuchsia-500 to-pink-400 shadow-[0_0_15px_rgba(217,70,239,0.4)]",
+                                        ];
+                                        const currentGradient = barGradients[optIdx % barGradients.length];
+
+                                        return (
+                                          <div key={opt.id || optIdx} className={`p-3.5 rounded-2xl border transition-all ${isMyChoice ? "bg-violet-950/40 border-violet-400/60 shadow-lg shadow-violet-950/40" : "bg-slate-950/60 border-slate-800/80"}`}>
+                                            <div className="flex justify-between items-center text-xs sm:text-sm font-bold mb-2">
+                                              <span className="text-white flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center font-black text-[10px] text-violet-300">
+                                                  {String.fromCharCode(65 + optIdx)}
+                                                </span>
+                                                <span>{opt.text}</span>
+                                                {isMyChoice && <span className="text-[10px] text-violet-300 font-extrabold bg-violet-500/20 px-2 py-0.5 rounded-full border border-violet-500/40">(Your Choice)</span>}
+                                              </span>
+                                              <span className="text-sky-400 font-black">{pct}% ({count} votes)</span>
+                                            </div>
+                                            <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden p-0.5 border border-white/[0.06]">
+                                              <div
+                                                className={`h-full bg-gradient-to-r ${currentGradient} rounded-full transition-all duration-1000 ease-out`}
+                                                style={{ width: `${pct}%` }}
+                                              />
+                                            </div>
                                           </div>
-                                          <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
-                                            <div className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-sky-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                ) : (
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
                                   <div className="space-y-4">
                                     <div className="space-y-2.5">
                                       {poll.options.map((opt, optIdx) => {
