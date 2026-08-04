@@ -184,3 +184,94 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
 .animate-liquid-shine {
   animation: liquid-shimmer 2.5s infinite linear;
 }
+
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-aurora {
+  animation: aurora 8s ease infinite;
+}
+
+.animate-gradient {
+  animation: gradient 6s linear infinite;
+}
+
+/* High-Quality Cyber Glitch Keyframes */
+@keyframes glitch-shake {
+  0% { transform: translate(0); }
+  20% { transform: translate(-3px, 2px) skewX(2deg); }
+  40% { transform: translate(3px, -2px) skewX(-2deg); }
+  60% { transform: translate(-2px, 1px) skewX(1deg); }
+  80% { transform: translate(2px, -1px) skewX(-1deg); }
+  100% { transform: translate(0); }
+}
+
+@keyframes glitch-slice-1 {
+  0% { clip-path: inset(40% 0 60% 0); transform: translate(-4px, -2px); }
+  20% { clip-path: inset(10% 0 85% 0); transform: translate(4px, 2px); }
+  40% { clip-path: inset(70% 0 15% 0); transform: translate(-3px, 3px); }
+  60% { clip-path: inset(25% 0 50% 0); transform: translate(3px, -1px); }
+  80% { clip-path: inset(80% 0 5% 0); transform: translate(-2px, -3px); }
+  100% { clip-path: inset(50% 0 30% 0); transform: translate(0); }
+}
+
+@keyframes glitch-slice-2 {
+  0% { clip-path: inset(65% 0 20% 0); transform: translate(4px, 2px); }
+  20% { clip-path: inset(20% 0 70% 0); transform: translate(-4px, -2px); }
+  40% { clip-path: inset(5% 0 80% 0); transform: translate(3px, -3px); }
+  60% { clip-path: inset(80% 0 10% 0); transform: translate(-3px, 1px); }
+  80% { clip-path: inset(30% 0 55% 0); transform: translate(2px, 3px); }
+  100% { clip-path: inset(15% 0 65% 0); transform: translate(0); }
+}
+
+.animate-glitch-shake {
+  animation: glitch-shake 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+.animate-glitch-slice-1 {
+  animation: glitch-slice-1 0.3s ease infinite;
+}
+
+.animate-glitch-slice-2 {
+  animation: glitch-slice-2 0.3s ease infinite;
+}
+
+/* Solid Black Neon Glitch & Flickering Keyframes */
+@keyframes text-flicker {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.4)); }
+  8% { opacity: 0.2; }
+  10% { opacity: 1; }
+  28% { opacity: 0.8; }
+  30% { opacity: 0.1; }
+  32% { opacity: 1; }
+  70% { opacity: 0.9; }
+  72% { opacity: 0.3; }
+  74% { opacity: 1; }
+  92% { opacity: 0.4; }
+  94% { opacity: 1; }
+}
+
+.animate-flicker {
+  animation: text-flicker 3s infinite;
+}

@@ -5,25 +5,38 @@ import { useEffect, useRef, useState } from "react";
 export function FuturisticScrollbar() {
   const trackRef = useRef<HTMLDivElement>(null);
   const [scrollPercent, setScrollPercent] = useState(0);
+  const [canScroll, setCanScroll] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Update scroll percentage based on window scroll
+  // Check if page height exceeds viewport height and update scroll percentage
   useEffect(() => {
     const handleScroll = () => {
-      if (isDragging) return;
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (scrollHeight <= 0) {
+      const scrollable = scrollHeight > 5;
+      setCanScroll(scrollable);
+
+      if (!scrollable) {
         setScrollPercent(0);
         return;
       }
+
+      if (isDragging) return;
       const progress = window.scrollY / scrollHeight;
       setScrollPercent(Math.max(0, Math.min(progress, 1)));
     };
 
     window.addEventListener("scroll", handleScroll);
+    window.addEventListener("resize", handleScroll);
     handleScroll();
 
-    return () => window.removeEventListener("scroll", handleScroll);
+    // Check periodically in case page content changes dynamically
+    const interval = setInterval(handleScroll, 500);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      clearInterval(interval);
+    };
   }, [isDragging]);
 
   // Handle click-and-drag anywhere on the track
@@ -73,6 +86,9 @@ export function FuturisticScrollbar() {
     const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo(0, progress * scrollHeight);
   };
+
+  // Hide scrollbar completely if page doesn't require scrolling
+  if (!canScroll) return null;
 
   return (
     <div

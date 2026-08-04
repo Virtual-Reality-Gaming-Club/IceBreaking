@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { AuroraText } from "@/components/ui/aurora-text";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 
@@ -50,16 +51,13 @@ export default function HomePage() {
             </p>
 
             <h1
-              className="animate-fade-in-up"
-              style={{ animationDelay: "50ms", fontSize: "clamp(2.5rem, 8vw, 4.2rem)", fontWeight: 900, lineHeight: 1.1, marginBottom: "18px", letterSpacing: "-0.02em" }}
+              className="animate-fade-in-up text-5xl font-black tracking-tight md:text-7xl lg:text-8xl flex items-center justify-center gap-3"
+              style={{ animationDelay: "50ms", lineHeight: 1.1, marginBottom: "18px" }}
             >
-              <span style={{
-                background: "linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}>
-                Glitch Fest
+              <span className="font-black text-white" style={{ color: "#ffffff", letterSpacing: "-0.03em" }}>
+                Glitch
               </span>
+              <AuroraText>Fest</AuroraText>
             </h1>
 
             {/* Action Buttons */}

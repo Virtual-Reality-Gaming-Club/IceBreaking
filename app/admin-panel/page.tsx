@@ -34,6 +34,8 @@ interface ParticipantItem {
   registeredAt?: any;
 }
 
+import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -691,10 +693,22 @@ export default function AdminDashboardPage() {
             ⚡
           </div>
           <div>
-            <h2 style={{ fontSize: "1.15rem", fontWeight: 900, margin: 0, letterSpacing: "-0.01em", background: "linear-gradient(90deg, #ffffff, #c4b5fd)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              VRGC Admin Portal
-            </h2>
-            <span style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <div className="group relative flex items-center justify-center rounded-full px-3.5 py-1 shadow-[inset_0_-8px_10px_#8fdfff1f] transition-shadow duration-500 ease-out hover:shadow-[inset_0_-5px_10px_#8fdfff3f] border border-violet-500/30 bg-slate-950/60">
+              <span
+                className="animate-gradient absolute inset-0 block h-full w-full rounded-[inherit] bg-gradient-to-r from-[#ffaa40]/50 via-[#9c40ff]/50 to-[#ffaa40]/50 bg-[length:300%_100%] p-[1px]"
+                style={{
+                  WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                  WebkitMaskComposite: "destination-out",
+                  mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+                  maskComposite: "subtract",
+                  WebkitClipPath: "padding-box",
+                }}
+              />
+              <AnimatedGradientText className="text-sm font-extrabold tracking-wide">
+                VRGC · VIT Bhopal
+              </AnimatedGradientText>
+            </div>
+            <span style={{ fontSize: "0.72rem", color: "#a78bfa", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", display: "block", marginTop: "2px", textAlign: "left" }}>
               IceBreaking 2026 Dashboard
             </span>
           </div>
@@ -841,63 +855,32 @@ export default function AdminDashboardPage() {
               </p>
 
               {/* Event Registration Status Control Banner */}
-              <div
-                style={{
-                  marginBottom: "32px",
-                  padding: "24px 28px",
-                  background: registrationOpen ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
-                  border: registrationOpen ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
-                  borderRadius: "16px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  gap: "16px",
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "1rem", fontWeight: 800, color: "#f8fafc" }}>
-                      📝 Event Registration Status:
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.8rem",
-                        padding: "3px 10px",
-                        borderRadius: "20px",
-                        fontWeight: 700,
-                        background: registrationOpen ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
-                        color: registrationOpen ? "#4ade80" : "#fca5a5",
-                        border: registrationOpen ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(239, 68, 68, 0.4)",
-                      }}
-                    >
-                      {registrationOpen ? "🟢 OPEN (Public Can Register)" : "🔒 CLOSED (Registration Locked)"}
-                    </span>
+              <Card className={`${registrationOpen ? "bg-emerald-950/20 border-emerald-500/30" : "bg-red-950/20 border-red-500/30"} shadow-xl mb-8 border backdrop-blur-xl`}>
+                <CardContent className="p-6 flex flex-row items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-1.5">
+                      <span className="text-base font-black text-white">
+                        📝 Event Registration Status:
+                      </span>
+                      <Badge className={registrationOpen ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold px-3 py-0.5 text-xs" : "bg-red-500/20 text-red-300 border-red-500/40 font-bold px-3 py-0.5 text-xs"}>
+                        {registrationOpen ? "🟢 OPEN (Public Can Register)" : "🔒 CLOSED (Registration Locked)"}
+                      </Badge>
+                    </div>
+                    <p className="text-slate-300 text-xs font-medium m-0">
+                      {registrationOpen
+                        ? "Users on the home page can click 'Register Now' to submit their details."
+                        : "The home page will display '🔒 Registration is currently closed.'"}
+                    </p>
                   </div>
-                  <p style={{ margin: 0, color: "#cbd5e1", fontSize: "0.88rem" }}>
-                    {registrationOpen
-                      ? "Users on the home page can click 'Register Now' to submit their details."
-                      : "The home page will display '🔒 Registration is currently closed.'"}
-                  </p>
-                </div>
 
-                <button
-                  onClick={handleToggleRegistration}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "10px",
-                    border: "none",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    cursor: "pointer",
-                    background: registrationOpen ? "linear-gradient(135deg, #ef4444, #dc2626)" : "linear-gradient(135deg, #22c55e, #16a34a)",
-                    color: "#ffffff",
-                    boxShadow: registrationOpen ? "0 0 15px rgba(239, 68, 68, 0.4)" : "0 0 15px rgba(34, 197, 94, 0.4)",
-                  }}
-                >
-                  {registrationOpen ? "🔒 Close Registration" : "🟢 Open Registration"}
-                </button>
-              </div>
+                  <button
+                    onClick={handleToggleRegistration}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg text-white ${registrationOpen ? "bg-red-600 hover:bg-red-500 shadow-red-600/30" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30"}`}
+                  >
+                    {registrationOpen ? "🔒 Close Registration" : "🟢 Open Registration"}
+                  </button>
+                </CardContent>
+              </Card>
 
               {/* Metrics Grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "22px", marginBottom: "40px" }}>
@@ -974,117 +957,88 @@ export default function AdminDashboardPage() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 4px" }}>Manage Events</h1>
+                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Manage Events</h1>
                   <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>View, create, edit, or update status of IceBreaking event activities.</p>
                 </div>
                 <button
                   onClick={() => handleOpenEventModal()}
-                  style={{
-                    background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    cursor: "pointer",
-                    boxShadow: "0 0 15px rgba(59, 130, 246, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2"
                 >
                   ➕ Create New Event
                 </button>
               </div>
 
-              <div style={{ display: "grid", gap: "16px" }}>
+              <div style={{ display: "grid", gap: "20px" }}>
                 {eventsList.length > 0 ? (
                   eventsList.map((evt: any) => (
-                    <div key={evt.id} style={{ padding: "24px", background: "rgba(17, 20, 32, 0.7)", border: "1px solid rgba(148, 163, 184, 0.15)", borderRadius: "16px" }}>
+                    <Card key={evt.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-blue-500/40 p-6">
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                         <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                            <span style={{ fontSize: "0.8rem", background: "rgba(59, 130, 246, 0.2)", color: "#60a5fa", border: "1px solid rgba(59, 130, 246, 0.3)", padding: "3px 10px", borderRadius: "6px", fontWeight: 600 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 font-extrabold text-[11px] px-2.5 py-0.5">
                               {evt.category || "General"}
-                            </span>
-                            <span style={{ fontSize: "0.75rem", padding: "3px 10px", borderRadius: "20px", fontWeight: 700, background: evt.status === "live" || evt.status === "active" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)", color: evt.status === "live" || evt.status === "active" ? "#4ade80" : "#fca5a5" }}>
+                            </Badge>
+                            <Badge className={evt.status === "live" || evt.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-[11px]"}>
                               ● {(evt.status || "upcoming").toUpperCase()}
-                            </span>
+                            </Badge>
                           </div>
-                          <h3 style={{ margin: "0 0 6px", fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc" }}>{evt.title}</h3>
-                          {evt.description && <p style={{ margin: "0 0 10px", color: "#94a3b8", fontSize: "0.88rem" }}>{evt.description}</p>}
-                          <div style={{ display: "flex", gap: "16px", fontSize: "0.8rem", color: "#cbd5e1" }}>
+                          <h3 style={{ margin: "0 0 8px", fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>{evt.title}</h3>
+                          {evt.description && <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: "0.9rem", lineHeight: 1.5 }}>{evt.description}</p>}
+                          <div style={{ display: "flex", gap: "18px", fontSize: "0.82rem", color: "#cbd5e1", fontWeight: 600 }}>
                             {evt.date && <span>📅 {evt.date}</span>}
                             {evt.venue && <span>📍 {evt.venue}</span>}
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "10px" }}>
                           <button
                             onClick={() => handleToggleEventStatus(evt)}
-                            style={{ padding: "6px 12px", background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(148, 163, 184, 0.2)", color: "#cbd5e1", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}
+                            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
                           >
-                            {evt.status === "live" || evt.status === "active" ? "Set Upcoming" : "Set Live"}
+                            {evt.status === "live" || evt.status === "active" ? "Pause/Upcoming" : "Set Live"}
                           </button>
                           <button
                             onClick={() => handleOpenEventModal(evt)}
-                            style={{ padding: "6px 12px", background: "rgba(59, 130, 246, 0.2)", border: "1px solid rgba(59, 130, 246, 0.4)", color: "#60a5fa", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}
+                            className="px-3.5 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 font-bold text-xs transition-all"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => handleDeleteEvent(evt.id)}
-                            style={{ padding: "6px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", color: "#fca5a5", borderRadius: "6px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}
+                            className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
                           </button>
                         </div>
                       </div>
-                    </div>
+                    </Card>
                   ))
                 ) : (
-                  <div style={{ padding: "40px", textAlign: "center", background: "rgba(17, 20, 32, 0.5)", border: "1px dashed rgba(148, 163, 184, 0.2)", borderRadius: "16px" }}>
+                  <Card className="bg-slate-950/60 border-dashed border-slate-800 p-10 text-center">
                     <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No events found in database.</p>
                     <button
                       onClick={() => handleOpenEventModal()}
-                      style={{ background: "#3b82f6", color: "#fff", border: "none", padding: "10px 18px", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}
+                      className="bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
                     >
                       Create First Event
                     </button>
-                  </div>
+                  </Card>
                 )}
               </div>
             </div>
           )}
-
-
-
 
           {/* POLLS TAB */}
           {activeTab === "polls" && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 4px" }}>Polls Management</h1>
+                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Polls Management</h1>
                   <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Create, edit, toggle active status, or delete audience polls.</p>
                 </div>
                 <button
                   onClick={() => handleOpenPollModal()}
-                  style={{
-                    background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    cursor: "pointer",
-                    boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center gap-2"
                 >
                   ➕ Create New Poll
                 </button>
@@ -1098,81 +1052,36 @@ export default function AdminDashboardPage() {
                       : poll.totalVotes || 0;
 
                     return (
-                      <div
-                        key={poll.id}
-                        style={{
-                          background: "rgba(17, 20, 32, 0.7)",
-                          border: "1px solid rgba(148, 163, 184, 0.15)",
-                          borderRadius: "16px",
-                          padding: "24px",
-                        }}
-                      >
+                      <Card key={poll.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-violet-500/40 p-6">
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                           <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                              <span
-                                style={{
-                                  fontSize: "0.75rem",
-                                  padding: "3px 10px",
-                                  borderRadius: "20px",
-                                  fontWeight: 700,
-                                  background: poll.status === "active" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                                  color: poll.status === "active" ? "#4ade80" : "#fca5a5",
-                                  border: poll.status === "active" ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
-                                }}
-                              >
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                              <Badge className={poll.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[11px]"}>
                                 {poll.status === "active" ? "🟢 Active Poll" : "🔴 Closed"}
-                              </span>
-                              <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>Total Votes: {totalVotes}</span>
+                              </Badge>
+                              <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 700 }}>Total Votes: {totalVotes}</span>
                             </div>
-                            <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc" }}>
+                            <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>
                               {poll.question}
                             </h3>
                           </div>
 
-                          <div style={{ display: "flex", gap: "8px" }}>
+                          <div style={{ display: "flex", gap: "10px" }}>
                             <button
                               onClick={() => handleTogglePollStatus(poll)}
-                              style={{
-                                padding: "6px 12px",
-                                background: "rgba(255, 255, 255, 0.05)",
-                                border: "1px solid rgba(148, 163, 184, 0.2)",
-                                color: "#cbd5e1",
-                                borderRadius: "6px",
-                                fontSize: "0.8rem",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
+                              className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
                             >
                               {poll.status === "active" ? "Pause/Close" : "Set Active"}
                             </button>
                             <button
                               onClick={() => handleOpenPollModal(poll)}
-                              style={{
-                                padding: "6px 12px",
-                                background: "rgba(124, 58, 237, 0.2)",
-                                border: "1px solid rgba(124, 58, 237, 0.4)",
-                                color: "#c4b5fd",
-                                borderRadius: "6px",
-                                fontSize: "0.8rem",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
+                              className="px-3.5 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 font-bold text-xs transition-all"
                             >
                               ✏️ Edit
                             </button>
                             <button
                               onClick={() => handleDeletePoll(poll.id)}
-                              style={{
-                                padding: "6px 12px",
-                                background: "rgba(239, 68, 68, 0.15)",
-                                border: "1px solid rgba(239, 68, 68, 0.3)",
-                                color: "#fca5a5",
-                                borderRadius: "6px",
-                                fontSize: "0.8rem",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
+                              className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                             >
                               🗑️ Delete
                             </button>
@@ -1180,44 +1089,36 @@ export default function AdminDashboardPage() {
                         </div>
 
                         {/* Poll Options Breakdown */}
-                        <div style={{ display: "grid", gap: "10px", marginTop: "16px" }}>
+                        <div style={{ display: "grid", gap: "12px", marginTop: "18px" }}>
                           {poll.options?.map((opt: any, idx: number) => {
                             const votes = opt.votes || 0;
                             const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
                             return (
-                              <div key={idx} style={{ background: "rgba(255, 255, 255, 0.03)", padding: "12px 16px", borderRadius: "10px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", fontWeight: 600, marginBottom: "6px" }}>
+                              <div key={idx} className="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80">
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", fontWeight: 700, marginBottom: "8px", color: "#f1f5f9" }}>
                                   <span>{opt.text}</span>
-                                  <span style={{ color: "#a78bfa" }}>{votes} votes ({percentage}%)</span>
+                                  <span style={{ color: "#c4b5fd" }}>{votes} votes ({percentage}%)</span>
                                 </div>
-                                <div style={{ height: "6px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", width: `${percentage}%`, background: "linear-gradient(90deg, #7c3aed, #a78bfa)", borderRadius: "4px", transition: "width 0.4s ease" }} />
+                                <div style={{ height: "8px", background: "rgba(15, 23, 42, 0.8)", borderRadius: "6px", overflow: "hidden", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                                  <div style={{ height: "100%", width: `${percentage}%`, background: "linear-gradient(90deg, #7c3aed, #3b82f6)", borderRadius: "6px", transition: "width 0.5s ease" }} />
                                 </div>
                               </div>
                             );
                           })}
                         </div>
-                      </div>
+                      </Card>
                     );
                   })
                 ) : (
-                  <div style={{ padding: "40px", textAlign: "center", background: "rgba(17, 20, 32, 0.5)", border: "1px dashed rgba(148, 163, 184, 0.2)", borderRadius: "16px" }}>
+                  <Card className="bg-slate-950/60 border-dashed border-slate-800 p-10 text-center">
                     <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No active or created polls yet.</p>
                     <button
                       onClick={() => handleOpenPollModal()}
-                      style={{
-                        background: "#7c3aed",
-                        color: "#fff",
-                        border: "none",
-                        padding: "10px 18px",
-                        borderRadius: "8px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      className="bg-violet-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
                     >
                       Create First Poll
                     </button>
-                  </div>
+                  </Card>
                 )}
               </div>
             </div>
@@ -1228,25 +1129,12 @@ export default function AdminDashboardPage() {
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 4px" }}>Quiz Management</h1>
-                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Create, edit, toggle status, or remove gaming trivia quizzes.</p>
+                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Quiz Management</h1>
+                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Create, edit, toggle active status, or delete live event quizzes.</p>
                 </div>
                 <button
                   onClick={() => handleOpenQuizModal()}
-                  style={{
-                    background: "linear-gradient(135deg, #ec4899, #be185d)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    cursor: "pointer",
-                    boxShadow: "0 0 15px rgba(236, 72, 153, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
+                  className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-pink-600/30 flex items-center gap-2"
                 >
                   ➕ Create New Quiz
                 </button>
@@ -1255,87 +1143,44 @@ export default function AdminDashboardPage() {
               <div style={{ display: "grid", gap: "20px" }}>
                 {quizzesList.length > 0 ? (
                   quizzesList.map((quiz) => (
-                    <div
-                      key={quiz.id}
-                      style={{
-                        background: "rgba(17, 20, 32, 0.7)",
-                        border: "1px solid rgba(148, 163, 184, 0.15)",
-                        borderRadius: "16px",
-                        padding: "24px",
-                      }}
-                    >
+                    <Card key={quiz.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-pink-500/40 p-6">
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                         <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
-                            <span
-                              style={{
-                                fontSize: "0.75rem",
-                                padding: "3px 10px",
-                                borderRadius: "20px",
-                                fontWeight: 700,
-                                background: quiz.status === "active" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                                color: quiz.status === "active" ? "#4ade80" : "#fca5a5",
-                                border: quiz.status === "active" ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
-                              }}
-                            >
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                            <Badge className={quiz.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[11px]"}>
                               {quiz.status === "active" ? "🟢 Active Quiz" : "🔴 Closed"}
-                            </span>
-                            <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>⏱️ {quiz.timeLimit || 10} Mins</span>
-                            <span style={{ fontSize: "0.8rem", color: "#f472b6", fontWeight: 600 }}>
+                            </Badge>
+                            <Badge variant="outline" className="bg-slate-900 text-slate-300 border-slate-700 font-bold text-[11px]">
+                              ⏱️ {quiz.timeLimit || 10} Mins
+                            </Badge>
+                            <Badge variant="outline" className="bg-pink-500/10 text-pink-400 border-pink-500/30 font-bold text-[11px]">
                               🏆 {quiz.totalPoints || 0} Total Points
-                            </span>
+                            </Badge>
                           </div>
-                          <h3 style={{ margin: "0 0 6px", fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc" }}>
+                          <h3 style={{ margin: "0 0 6px", fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>
                             {quiz.title}
                           </h3>
                           {quiz.description && (
-                            <p style={{ color: "#94a3b8", fontSize: "0.88rem", margin: 0 }}>{quiz.description}</p>
+                            <p style={{ color: "#94a3b8", fontSize: "0.9rem", margin: 0, lineHeight: 1.5 }}>{quiz.description}</p>
                           )}
                         </div>
 
-                        <div style={{ display: "flex", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "10px" }}>
                           <button
                             onClick={() => handleToggleQuizStatus(quiz)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(255, 255, 255, 0.05)",
-                              border: "1px solid rgba(148, 163, 184, 0.2)",
-                              color: "#cbd5e1",
-                              borderRadius: "6px",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
+                            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
                           >
                             {quiz.status === "active" ? "Pause/Close" : "Set Active"}
                           </button>
                           <button
                             onClick={() => handleOpenQuizModal(quiz)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(236, 72, 153, 0.2)",
-                              border: "1px solid rgba(236, 72, 153, 0.4)",
-                              color: "#f472b6",
-                              borderRadius: "6px",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
+                            className="px-3.5 py-2 rounded-xl bg-pink-500/15 border border-pink-500/30 text-pink-300 hover:bg-pink-500/25 font-bold text-xs transition-all"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => handleDeleteQuiz(quiz.id)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(239, 68, 68, 0.15)",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                              color: "#fca5a5",
-                              borderRadius: "6px",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
+                            className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
                           </button>
@@ -1343,39 +1188,31 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {/* Quiz Questions Preview */}
-                      <div style={{ marginTop: "16px", background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.05)", borderRadius: "12px", padding: "16px" }}>
-                        <h4 style={{ margin: "0 0 12px", fontSize: "0.9rem", color: "#c4b5fd", fontWeight: 700 }}>
+                      <div className="mt-4 bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
+                        <h4 className="m-0 mb-3 text-xs uppercase tracking-wider font-extrabold text-violet-300">
                           Questions ({quiz.questions?.length || 0})
                         </h4>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {quiz.questions?.map((q: any, idx: number) => (
                             <div key={idx} style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>
-                              <strong>Q{idx + 1}:</strong> {q.question}{" "}
-                              <span style={{ color: "#4ade80", fontSize: "0.78rem" }}>({q.points || 10} pts)</span>
+                              <strong className="text-white">Q{idx + 1}:</strong> {q.question}{" "}
+                              <span style={{ color: "#4ade80", fontSize: "0.78rem", fontWeight: 700 }}>({q.points || 10} pts)</span>
                             </div>
                           ))}
                         </div>
                       </div>
-                    </div>
+                    </Card>
                   ))
                 ) : (
-                  <div style={{ padding: "40px", textAlign: "center", background: "rgba(17, 20, 32, 0.5)", border: "1px dashed rgba(148, 163, 184, 0.2)", borderRadius: "16px" }}>
+                  <Card className="bg-slate-950/60 border-dashed border-slate-800 p-10 text-center">
                     <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No active or created quizzes yet.</p>
                     <button
                       onClick={() => handleOpenQuizModal()}
-                      style={{
-                        background: "#ec4899",
-                        color: "#fff",
-                        border: "none",
-                        padding: "10px 18px",
-                        borderRadius: "8px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
+                      className="bg-pink-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
                     >
                       Create First Quiz
                     </button>
-                  </div>
+                  </Card>
                 )}
               </div>
             </div>
