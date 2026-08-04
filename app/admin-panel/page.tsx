@@ -84,6 +84,14 @@ export default function AdminDashboardPage() {
   const [eventDate, setEventDate] = useState("");
   const [isSavingEvent, setIsSavingEvent] = useState(false);
 
+  // Participant Edit & Delete State
+  const [participantModalOpen, setParticipantModalOpen] = useState(false);
+  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null);
+  const [editParticipantName, setEditParticipantName] = useState("");
+  const [editParticipantReg, setEditParticipantReg] = useState("");
+  const [editParticipantScore, setEditParticipantScore] = useState(0);
+  const [isSavingParticipant, setIsSavingParticipant] = useState(false);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -401,6 +409,98 @@ export default function AdminDashboardPage() {
       fetchQuizzes();
     } catch (err) {
       console.error("Error deleting quiz:", err);
+    }
+  };
+
+  // PARTICIPANT HANDLERS (Firestore 'participants' collection)
+  const handleOpenParticipantModal = (participant?: ParticipantItem) => {
+    if (participant) {
+      setEditingParticipantId(participant.id);
+      setEditParticipantName(participant.fullName || participant.name || "");
+      setEditParticipantReg(participant.registrationNumber || participant.id || "");
+      setEditParticipantScore(participant.totalScore || 0);
+    } else {
+      setEditingParticipantId(null);
+      setEditParticipantName("");
+      setEditParticipantReg("");
+      setEditParticipantScore(0);
+    }
+    setParticipantModalOpen(true);
+  };
+
+  const handleSaveParticipant = async () => {
+    if (!editParticipantReg.trim() || !editParticipantName.trim()) {
+      alert("Please provide both Name and Registration Number.");
+      return;
+    }
+
+    const normalizedReg = editParticipantReg.trim().toUpperCase();
+    const normalizedName = editParticipantName.trim();
+
+    setIsSavingParticipant(true);
+    try {
+      const { doc, setDoc, deleteDoc, getDoc } = await import("firebase/firestore");
+
+      if (editingParticipantId) {
+        // If registration number changed, migrate/create new doc and remove old doc
+        if (editingParticipantId !== normalizedReg) {
+          const oldDocRef = doc(db, "participants", editingParticipantId);
+          const oldDocSnap = await getDoc(oldDocRef);
+          const oldData = oldDocSnap.exists() ? oldDocSnap.data() : {};
+
+          // Write new document with updated registration number
+          await setDoc(doc(db, "participants", normalizedReg), {
+            ...oldData,
+            registrationNumber: normalizedReg,
+            fullName: normalizedName,
+            totalScore: Number(editParticipantScore) || 0,
+            updatedAt: new Date().toISOString(),
+          });
+
+          // Delete old document
+          await deleteDoc(oldDocRef);
+        } else {
+          // Registration number unchanged - update existing document
+          await setDoc(
+            doc(db, "participants", editingParticipantId),
+            {
+              fullName: normalizedName,
+              registrationNumber: normalizedReg,
+              totalScore: Number(editParticipantScore) || 0,
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+        }
+      } else {
+        // Create new participant document
+        await setDoc(doc(db, "participants", normalizedReg), {
+          registrationNumber: normalizedReg,
+          fullName: normalizedName,
+          totalScore: Number(editParticipantScore) || 0,
+          registeredAt: new Date().toISOString(),
+        });
+      }
+
+      setParticipantModalOpen(false);
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Error saving participant:", err);
+      alert("Failed to save participant document. Check console.");
+    } finally {
+      setIsSavingParticipant(false);
+    }
+  };
+
+  const handleDeleteParticipant = async (participantId: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete participant entry '${name || participantId}'?`)) return;
+    try {
+      const { doc, deleteDoc } = await import("firebase/firestore");
+      await deleteDoc(doc(db, "participants", participantId));
+      fetchDashboardData();
+    } catch (err) {
+      console.error("Error deleting participant:", err);
+      alert("Failed to delete participant entry.");
     }
   };
 
@@ -1156,28 +1256,85 @@ export default function AdminDashboardPage() {
           {/* USERS TAB */}
           {activeTab === "users" && (
             <div>
-              <h1 style={{ fontSize: "1.8rem", fontWeight: 800, marginBottom: "8px" }}>Registered Participants</h1>
-              <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>User directory and gaming event registrations from Firestore.</p>
-              
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <div>
+                  <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 4px" }}>Registered Participants</h1>
+                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Manage event participant registrations, scores, and entries in Firestore.</p>
+                </div>
+                <button
+                  onClick={() => handleOpenParticipantModal()}
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed, #3b82f6)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    fontWeight: 700,
+                    fontSize: "0.9rem",
+                    cursor: "pointer",
+                    boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  ➕ Add New Participant
+                </button>
+              </div>
+
               <div style={{ background: "rgba(17, 20, 32, 0.7)", border: "1px solid rgba(148, 163, 184, 0.12)", borderRadius: "16px", padding: "20px" }}>
                 {participantsList.length > 0 ? (
-                  participantsList.map((u) => (
-                    <div key={u.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
-                      <div>
-                        <h4 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 700, color: "#f8fafc" }}>
-                          {u.fullName || u.name || "Participant"}
-                        </h4>
-                        <span style={{ fontSize: "0.82rem", color: "#a78bfa", fontWeight: 600 }}>
-                          Reg #: {u.registrationNumber || u.id}
-                        </span>
+                  participantsList.map((u) => {
+                    const pName = u.fullName || u.name || "Participant";
+                    const pReg = u.registrationNumber || u.id;
+                    return (
+                      <div key={u.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", borderBottom: "1px solid rgba(148, 163, 184, 0.1)", flexWrap: "wrap", gap: "12px" }}>
+                        <div>
+                          <h4 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 700, color: "#f8fafc" }}>
+                            {pName}
+                          </h4>
+                          <span style={{ fontSize: "0.82rem", color: "#a78bfa", fontWeight: 600 }}>
+                            Reg #: {pReg}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <span style={{ fontSize: "0.85rem", background: "rgba(124, 58, 237, 0.2)", color: "#c4b5fd", padding: "4px 10px", borderRadius: "6px", fontWeight: 700 }}>
+                            ⭐ Score: {u.totalScore || 0} pts
+                          </span>
+                          <button
+                            onClick={() => handleOpenParticipantModal(u)}
+                            style={{
+                              padding: "6px 12px",
+                              background: "rgba(59, 130, 246, 0.2)",
+                              border: "1px solid rgba(59, 130, 246, 0.4)",
+                              color: "#60a5fa",
+                              borderRadius: "6px",
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteParticipant(u.id, pName)}
+                            style={{
+                              padding: "6px 12px",
+                              background: "rgba(239, 68, 68, 0.15)",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              color: "#fca5a5",
+                              borderRadius: "6px",
+                              fontSize: "0.8rem",
+                              cursor: "pointer",
+                              fontWeight: 600,
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <span style={{ fontSize: "0.85rem", background: "rgba(124, 58, 237, 0.2)", color: "#c4b5fd", padding: "4px 10px", borderRadius: "6px", fontWeight: 700 }}>
-                          ⭐ Score: {u.totalScore || 0} pts
-                        </span>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <p style={{ color: "#94a3b8" }}>No registered participants found in Firestore collection 'participants'.</p>
                 )}
@@ -1962,6 +2119,151 @@ export default function AdminDashboardPage() {
                 }}
               >
                 {isSavingEvent ? "Saving..." : editingEventId ? "Update Event" : "Create Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PARTICIPANT EDIT / ADD MODAL */}
+      {participantModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            background: "rgba(0, 0, 0, 0.75)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              background: "#0d111d",
+              border: "1px solid rgba(124, 58, 237, 0.35)",
+              borderRadius: "20px",
+              padding: "28px",
+              boxShadow: "0 0 40px rgba(124, 58, 237, 0.25)",
+            }}
+          >
+            <h2 style={{ margin: "0 0 6px", fontSize: "1.3rem", fontWeight: 800, color: "#f8fafc" }}>
+              {editingParticipantId ? "✏️ Edit Participant Details" : "➕ Add New Participant"}
+            </h2>
+            <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 24px" }}>
+              {editingParticipantId
+                ? "Update registration number, full name, or points for this participant."
+                : "Manually add a participant registration record to Firestore."}
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
+                  Registration Number (e.g. 25BCY10001)
+                </label>
+                <input
+                  type="text"
+                  value={editParticipantReg}
+                  onChange={(e) => setEditParticipantReg(e.target.value.toUpperCase())}
+                  placeholder="25BCY10001"
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    background: "#161b2c",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    borderRadius: "10px",
+                    color: "#fff",
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={editParticipantName}
+                  onChange={(e) => setEditParticipantName(e.target.value)}
+                  placeholder="John Doe"
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    background: "#161b2c",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    borderRadius: "10px",
+                    color: "#fff",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
+                  Total Points / Score
+                </label>
+                <input
+                  type="number"
+                  value={editParticipantScore}
+                  onChange={(e) => setEditParticipantScore(Number(e.target.value))}
+                  placeholder="0"
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    background: "#161b2c",
+                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    borderRadius: "10px",
+                    color: "#fff",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
+              <button
+                type="button"
+                onClick={() => setParticipantModalOpen(false)}
+                style={{
+                  padding: "10px 18px",
+                  background: "transparent",
+                  border: "1px solid rgba(148, 163, 184, 0.2)",
+                  color: "#94a3b8",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveParticipant}
+                disabled={isSavingParticipant}
+                style={{
+                  padding: "10px 22px",
+                  background: "linear-gradient(135deg, #7c3aed, #3b82f6)",
+                  border: "none",
+                  color: "#fff",
+                  borderRadius: "10px",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  opacity: isSavingParticipant ? 0.6 : 1,
+                  boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
+                }}
+              >
+                {isSavingParticipant ? "Saving..." : editingParticipantId ? "Update Entry" : "Save Participant"}
               </button>
             </div>
           </div>
