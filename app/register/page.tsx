@@ -2,10 +2,9 @@
 
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { RegistrationForm } from "@/components/registration/RegistrationForm";
 
 export default function RegisterPage() {
-  // Backend state handled manually later
-  const isLoading = false;
   const isRegistrationOpen = true;
 
   return (
@@ -22,10 +21,9 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Form placeholder for when backend is connected */}
         {isRegistrationOpen && (
-          <div className="animate-fade-in-up" style={{ width: "100%", maxWidth: "448px", animationDelay: "100ms", background: "rgba(10, 13, 24, 0.9)", padding: "24px", borderRadius: "16px", border: "1px solid rgba(124, 58, 237, 0.3)" }}>
-            <p style={{ color: "#cbd5e1", textAlign: "center" }}>[ Registration form will go here ]</p>
+          <div className="animate-fade-in-up" style={{ width: "100%", animationDelay: "100ms" }}>
+            <RegistrationForm />
           </div>
         )}
       </main>
