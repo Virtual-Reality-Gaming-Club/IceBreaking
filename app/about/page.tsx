@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { Globe } from "lucide-react";
+import { Globe, X } from "lucide-react";
+import Link from "next/link";
 
 export default function AboutPage() {
   const [mounted, setMounted] = useState(false);
@@ -16,44 +17,85 @@ export default function AboutPage() {
   if (!mounted) return null;
 
   return (
-    <div style={{ height: "100dvh", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", position: "relative" }}>
       <PublicNavbar />
 
       <main style={{
         flex: 1,
-        padding: "clamp(60px, 15vh, 100px) 15px clamp(40px, 10vh, 60px)",
-        maxWidth: "900px",
+        padding: "60px 20px 60px",
+        maxWidth: "820px",
         margin: "0 auto",
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "center",
+        justifyContent: "flex-start",
         alignItems: "center",
         position: "relative",
         zIndex: 10
       }}>
 
         <div className="animate-fade-in-up" style={{
-          background: "rgba(10, 13, 24, 0.75)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          border: "1px solid rgba(124, 58, 237, 0.2)",
+          background: "rgba(10, 13, 24, 0.88)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(124, 58, 237, 0.3)",
           borderRadius: "24px",
-          padding: "clamp(20px, 4vh, 40px) clamp(20px, 5vw, 40px)",
-          boxShadow: "0 20px 45px rgba(0, 0, 0, 0.5)",
+          padding: "clamp(28px, 4vh, 44px) clamp(20px, 4vw, 36px)",
+          boxShadow: "0 20px 45px rgba(0, 0, 0, 0.6), 0 0 30px rgba(124, 58, 237, 0.15)",
           textAlign: "center",
           width: "100%",
-          maxHeight: "100%",
-          overflowY: "auto", // In case it gets too small on tiny phones, allow internal scroll to prevent layout break
-          scrollbarWidth: "none",
+          position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          marginTop: "10px",
+          marginBottom: "30px",
         }}>
 
+
+          {/* Top-Right Close (X) Button */}
+          <div style={{ position: "absolute", top: "20px", right: "20px", zIndex: 20 }}>
+            <Link href="/" style={{ textDecoration: "none" }}>
+              <button
+                aria-label="Close page and return to home"
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
+                  color: "#cbd5e1",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(239, 68, 68, 0.2)";
+                  e.currentTarget.style.color = "#f87171";
+                  e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
+                  e.currentTarget.style.color = "#cbd5e1";
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.15)";
+                }}
+              >
+                <X size={20} />
+              </button>
+            </Link>
+          </div>
+
+          <div style={{ marginTop: "10px" }} />
+
           <h1 style={{
-            fontSize: "clamp(1.5rem, 5vw, 2.2rem)",
+            fontSize: "clamp(1.6rem, 5vw, 2.3rem)",
             fontWeight: 900,
             color: "#f8fafc",
-            marginBottom: "clamp(10px, 2vh, 16px)",
-            letterSpacing: "0.02em"
+            marginBottom: "clamp(12px, 2vh, 20px)",
+            letterSpacing: "0.02em",
+            textAlign: "center",
           }}>
             Mission Statement
           </h1>
