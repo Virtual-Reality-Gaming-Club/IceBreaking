@@ -19,7 +19,7 @@ const AudioContext = createContext<AudioContextType>({
 });
 
 // Pages that display the background video
-const VIDEO_PAGES = ["/", "/register", "/about"];
+const VIDEO_PAGES = ["/", "/register", "/about", "/event"];
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [muted, setMuted] = useState(true);

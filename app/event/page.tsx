@@ -320,7 +320,45 @@ export default function EventsHubPage() {
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {/* Stats Pills */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                {/* Score */}
+                <div
+                  style={{
+                    background: "rgba(17, 20, 32, 0.8)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "12px",
+                    padding: "8px 16px",
+                    textAlign: "center",
+                  }}
+                >
+                  <span style={{ display: "block", fontSize: "0.68rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Score
+                  </span>
+                  <span style={{ fontSize: "1.3rem", fontWeight: 900, color: "#38bdf8" }}>
+                    0 <span style={{ fontSize: "0.7rem", color: "#64748b" }}>PTS</span>
+                  </span>
+                </div>
+
+                {/* Rank */}
+                <div
+                  style={{
+                    background: "rgba(17, 20, 32, 0.8)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: "12px",
+                    padding: "8px 16px",
+                    textAlign: "center",
+                  }}
+                >
+                  <span style={{ display: "block", fontSize: "0.68rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                    Rank
+                  </span>
+                  <span style={{ fontSize: "1.3rem", fontWeight: 900, color: "#a78bfa" }}>
+                    #—
+                  </span>
+                </div>
+
+                {/* Switch button */}
                 <button
                   onClick={handleSwitchUser}
                   style={{
@@ -328,16 +366,18 @@ export default function EventsHubPage() {
                     border: "1px solid rgba(255, 255, 255, 0.1)",
                     color: "#94a3b8",
                     borderRadius: "10px",
-                    padding: "8px 14px",
-                    fontSize: "0.82rem",
-                    fontWeight: 600,
+                    padding: "8px 12px",
+                    fontSize: "0.78rem",
                     cursor: "pointer",
+                    transition: "all 0.2s",
                   }}
+                  title="Switch Participant"
                 >
                   Switch ⇄
                 </button>
               </div>
             </div>
+
 
             {/* Live Activities Container */}
             <div

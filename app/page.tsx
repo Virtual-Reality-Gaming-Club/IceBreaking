@@ -33,14 +33,20 @@ export default function HomePage() {
               className="animate-fade-in-up"
               style={{ animationDelay: "0ms", fontSize: "0.82rem", fontWeight: 700, color: "#a78bfa", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: "12px" }}
             >
-              VRGC PRESENTS
+              VRGC · VIT BHOPAL UNIVERSITY
             </p>
 
             <h1
               className="animate-fade-in-up"
-              style={{ animationDelay: "50ms", fontSize: "clamp(2.4rem, 7vw, 3.8rem)", fontWeight: 900, lineHeight: 1.1, marginBottom: "14px", color: "#f8fafc", letterSpacing: "-0.02em" }}
+              style={{ animationDelay: "50ms", fontSize: "clamp(2.5rem, 8vw, 4.2rem)", fontWeight: 900, lineHeight: 1.1, marginBottom: "18px", letterSpacing: "-0.02em" }}
             >
-              <span className="text-gradient-primary">IceBreaking</span>
+              <span style={{
+                background: "linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}>
+                Glitch Fest
+              </span>
             </h1>
 
             <p
