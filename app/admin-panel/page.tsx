@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { VideoBackground } from "@/components/ui/VideoBackground";
+import { ChevronDown } from "lucide-react";
 
 interface EventItem {
   id: string;
@@ -718,23 +719,7 @@ export default function AdminDashboardPage() {
   return (
     <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at 20% -10%, rgba(124, 58, 237, 0.15), transparent 60%), radial-gradient(ellipse at 80% 110%, rgba(59, 130, 246, 0.1), transparent 60%), #06070a", color: "#f8fafc", fontFamily: "system-ui, sans-serif" }}>
       {/* Top Navbar */}
-      <header
-        style={{
-          height: "72px",
-          borderBottom: "1px solid rgba(124, 58, 237, 0.25)",
-          background: "rgba(10, 13, 24, 0.85)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          padding: "0 36px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(124, 58, 237, 0.1)",
-        }}
-      >
+      <header className="min-h-[64px] sm:h-[72px] border-b border-violet-500/25 bg-[#0a0d18]/85 backdrop-blur-2xl px-4 sm:px-9 flex items-center justify-between sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(124,58,237,0.1)] flex-wrap gap-2 py-2 sm:py-0">
         <Link href="/" className="flex items-center gap-3.5 hover:opacity-90 transition-opacity no-underline">
           <Image
             src="/logo.png"
@@ -766,28 +751,28 @@ export default function AdminDashboardPage() {
           </div>
         </Link>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+        <div className="flex items-center gap-2 sm:gap-5">
           {/* User Profile Avatar & Info */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(15, 20, 35, 0.6)", padding: "6px 14px 6px 8px", borderRadius: "30px", border: "1px solid rgba(124, 58, 237, 0.25)" }}>
-            <Avatar>
+          <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1423]/60 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-violet-500/25">
+            <Avatar className="w-7 h-7 sm:w-10 sm:h-10">
               <AvatarImage
                 src={user?.photoURL || undefined}
                 alt={user?.displayName || "Admin Avatar"}
               />
-              <AvatarFallback className="bg-violet-900 text-violet-200 font-bold">
+              <AvatarFallback className="bg-violet-900 text-violet-200 font-bold text-xs sm:text-base">
                 {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
 
-            <div style={{ textAlign: "left" }}>
-              <p style={{ margin: 0, fontSize: "0.9rem", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2 }}>
+            <div className="text-left hidden xs:block sm:block">
+              <p className="m-0 text-xs sm:text-sm font-extrabold text-slate-100 leading-tight">
                 {user?.displayName
                   ? user.displayName.replace(/\b[0-9]{2}[A-Za-z]{3}[0-9]{5}\b/gi, "").trim()
                   : "Admin User"}
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold">
-                  👑 Superadmin
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold text-[10px] px-1.5 py-0">
+                  👑 Admin
                 </Badge>
               </div>
             </div>
@@ -798,72 +783,85 @@ export default function AdminDashboardPage() {
               await signOut(auth);
               router.push("/admin-panel/login");
             }}
-            style={{
-              padding: "9px 18px",
-              fontSize: "0.85rem",
-              fontWeight: 700,
-              background: "rgba(239, 68, 68, 0.12)",
-              color: "#fca5a5",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "12px",
-              cursor: "pointer",
-              transition: "all 0.25s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(239, 68, 68, 0.25)";
-              e.currentTarget.style.color = "#ffffff";
-              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
-              e.currentTarget.style.boxShadow = "0 0 15px rgba(239, 68, 68, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)";
-              e.currentTarget.style.color = "#fca5a5";
-              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-red-500/15 text-red-300 border border-red-500/30 rounded-xl cursor-pointer hover:bg-red-500/30 hover:text-white transition-all shadow-sm"
           >
             🚪 Sign Out
           </button>
         </div>
       </header>
 
-      <div style={{ display: "flex", minHeight: "calc(100vh - 72px)" }}>
-        {/* Sidebar Navigation */}
-        <aside className="w-64 border-r border-violet-500/20 bg-slate-950/40 backdrop-blur-2xl p-5 flex flex-col gap-2 shrink-0">
-          {[
-            { id: "overview", label: "📊 Overview" },
-            { id: "leaderboard", label: "🏆 Live Leaderboard ↗", external: true },
-            { id: "events", label: "🎮 Manage Events" },
-            { id: "polls", label: "📊 Manage Polls" },
-            { id: "quizzes", label: "🧠 Manage Quizzes" },
-            { id: "users", label: "👥 Participants" },
-            { id: "admins", label: "🛡️ Admin Roster" },
-            { id: "tools", label: "⚙️ Database Tools" },
-          ].map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.external) {
+      <div className="flex flex-col md:flex-row min-h-[calc(100vh-72px)]">
+        {/* Navigation Sidebar (Desktop vertical list & Mobile Dropdown menu) */}
+        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-violet-500/20 bg-slate-950/80 md:bg-slate-950/40 backdrop-blur-2xl p-3 md:p-5 flex flex-col gap-2 shrink-0 sticky top-[64px] sm:top-[72px] z-40">
+          
+          {/* Mobile Dropdown Select */}
+          <div className="md:hidden relative w-full">
+            <label className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1 block px-1">
+              Navigate Section
+            </label>
+            <div className="relative">
+              <select
+                value={activeTab}
+                onChange={(e) => {
+                  const selectedVal = e.target.value;
+                  if (selectedVal === "leaderboard") {
                     window.open("/leaderboard", "_blank");
                   } else {
-                    setActiveTab(item.id as any);
+                    setActiveTab(selectedVal as any);
                   }
                 }}
-                className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-between ${
-                  isActive
-                    ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white shadow-[0_0_20px_rgba(124,58,237,0.25)]"
-                    : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
-                }`}
+                className="w-full appearance-none bg-slate-900/90 border border-violet-400/50 text-white text-xs font-bold py-2.5 pl-3.5 pr-10 rounded-xl outline-none backdrop-blur-xl shadow-lg focus:ring-2 focus:ring-violet-500"
               >
-                <span>{item.label}</span>
-                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />}
-              </button>
-            );
-          })}
+                <option value="overview">📊 Overview</option>
+                <option value="leaderboard">🏆 Live Leaderboard ↗ (Opens New Tab)</option>
+                <option value="events">🎮 Manage Events</option>
+                <option value="polls">📊 Manage Polls</option>
+                <option value="quizzes">🧠 Manage Quizzes</option>
+                <option value="users">👥 Participants</option>
+                <option value="admins">🛡️ Admin Roster</option>
+                <option value="tools">⚙️ Database Tools</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-300 pointer-events-none" size={16} />
+            </div>
+          </div>
 
-          <div className="mt-auto pt-4 border-t border-white/[0.08]">
+          {/* Desktop Navigation List */}
+          <div className="hidden md:flex flex-col gap-2 w-full">
+            {[
+              { id: "overview", label: "📊 Overview" },
+              { id: "leaderboard", label: "🏆 Live Leaderboard ↗", external: true },
+              { id: "events", label: "🎮 Manage Events" },
+              { id: "polls", label: "📊 Manage Polls" },
+              { id: "quizzes", label: "🧠 Manage Quizzes" },
+              { id: "users", label: "👥 Participants" },
+              { id: "admins", label: "🛡️ Admin Roster" },
+              { id: "tools", label: "⚙️ Database Tools" },
+            ].map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.external) {
+                      window.open("/leaderboard", "_blank");
+                    } else {
+                      setActiveTab(item.id as any);
+                    }
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                    isActive
+                      ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white shadow-[0_0_20px_rgba(124,58,237,0.25)]"
+                      : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {isActive && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-auto pt-4 border-t border-white/[0.08] hidden md:block">
             <Link
               href="/"
               className="text-violet-400 hover:text-violet-300 text-xs font-bold flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.04] transition-all"
@@ -874,7 +872,7 @@ export default function AdminDashboardPage() {
         </aside>
 
         {/* Main Content Area */}
-        <main style={{ flex: 1, padding: "36px 44px", maxWidth: "1250px" }}>
+        <main className="flex-1 p-4 sm:p-8 md:p-11 max-w-[1250px] w-full mx-auto">
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div>
@@ -911,66 +909,66 @@ export default function AdminDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Metrics Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "22px", marginBottom: "40px" }}>
+              {/* Metrics Grid — Ultra-concise on mobile */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-5 mb-6">
                 {[
-                  { label: "Total Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
+                  { label: "Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
                   { label: "Active Events", value: eventsList.length, color: "#38bdf8", accent: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
                   { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
                   { label: "Active Quizzes", value: quizzesList.length, color: "#c084fc", accent: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
-                  { label: "System Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+                  { label: "Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
                 ].map((card, idx) => (
-                  <Card key={idx} className="bg-white/[0.02] border-white/[0.08] shadow-[0_0_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl relative overflow-hidden transition-all duration-300 hover:border-violet-400/50 hover:shadow-[0_0_25px_rgba(139,92,246,0.15)] ring-1 ring-white/[0.04]">
-                    <CardHeader className="pb-2">
-                      <CardDescription className="text-slate-400 font-bold text-xs uppercase tracking-wider">{card.label}</CardDescription>
-                      <CardTitle className="text-3xl font-black text-white" style={{ color: card.color }}>
+                  <Card key={idx} className="bg-white/[0.02] border-white/[0.08] shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-2xl relative overflow-hidden transition-all duration-300 hover:border-violet-400/50 ring-1 ring-white/[0.04] p-2.5 sm:p-5 flex flex-col justify-between">
+                    <div>
+                      <CardDescription className="text-slate-400 font-bold text-[9px] sm:text-xs uppercase tracking-wider truncate mb-0.5">{card.label}</CardDescription>
+                      <CardTitle className="text-xl sm:text-3xl font-black text-white" style={{ color: card.color }}>
                         {card.value}
                       </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 pb-4">
-                      <Badge variant="outline" className={`${card.accent} font-bold text-[11px] px-2.5 py-0.5`}>
-                        Live System Data
+                    </div>
+                    <div className="mt-1 sm:mt-2">
+                      <Badge variant="outline" className={`${card.accent} font-bold text-[8px] sm:text-[11px] px-1.5 py-0 sm:py-0.5 whitespace-nowrap`}>
+                        Live Data
                       </Badge>
-                    </CardContent>
+                    </div>
                   </Card>
                 ))}
               </div>
 
               {/* Registered System Admins Box */}
-              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl p-6 backdrop-blur-2xl ring-1 ring-white/[0.04]">
-                <CardHeader className="px-0 pt-0 pb-6 border-b border-white/[0.08] flex flex-row items-center justify-between">
+              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl p-4 sm:p-6 backdrop-blur-2xl ring-1 ring-white/[0.04] overflow-hidden">
+                <CardHeader className="px-0 pt-0 pb-4 sm:pb-6 border-b border-white/[0.08] flex flex-row items-center justify-between flex-wrap gap-2">
                   <div>
-                    <CardTitle className="text-xl font-black text-white">Registered Superadmins</CardTitle>
-                    <CardDescription className="text-slate-400 mt-1 text-sm">Verified administrator roster with full system privileges.</CardDescription>
+                    <CardTitle className="text-lg sm:text-xl font-black text-white">Registered Superadmins</CardTitle>
+                    <CardDescription className="text-slate-400 mt-0.5 sm:mt-1 text-xs sm:text-sm">Verified administrator roster with full system privileges.</CardDescription>
                   </div>
-                  <Badge variant="outline" className="bg-violet-500/15 text-violet-300 border-violet-500/40 px-3.5 py-1 font-bold text-xs">
+                  <Badge variant="outline" className="bg-violet-500/15 text-violet-300 border-violet-500/40 px-2.5 sm:px-3.5 py-0.5 sm:py-1 font-bold text-[10px] sm:text-xs">
                     🛡️ 2 Active Admins
                   </Badge>
                 </CardHeader>
 
-                <CardContent className="px-0 pt-6">
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+                <CardContent className="px-0 pt-3 sm:pt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
                     {[
                       { name: "Jaiyansh", email: "jaiyansh.25bcy10268@vitbhopal.ac.in", role: "Superadmin", initial: "J", bg: "from-violet-600 to-indigo-900" },
                       { name: "Abhinav Mishra", email: "abhinav.25bcy10254@vitbhopal.ac.in", role: "Superadmin", initial: "A", bg: "from-blue-600 to-indigo-900" },
                     ].map((admin, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all shadow-lg backdrop-blur-md"
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all shadow-lg backdrop-blur-md gap-2.5 overflow-hidden"
                       >
-                        <div className="flex items-center gap-4">
-                          <Avatar size="lg">
-                            <AvatarFallback className={`bg-gradient-to-br ${admin.bg} text-white font-black text-lg border border-white/20`}>
+                        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 w-full sm:w-auto">
+                          <Avatar className="w-9 h-9 sm:w-12 sm:h-12 shrink-0">
+                            <AvatarFallback className={`bg-gradient-to-br ${admin.bg} text-white font-black text-sm sm:text-lg border border-white/20`}>
                               {admin.initial}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <strong className="text-base font-black text-white block">{admin.name}</strong>
-                            <span className="text-xs text-slate-400 font-semibold block mt-0.5">{admin.email}</span>
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <strong className="text-xs sm:text-base font-black text-white block truncate">{admin.name}</strong>
+                            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold block mt-0.5 truncate">{admin.email}</span>
                           </div>
                         </div>
 
-                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold px-3 py-1 text-xs">
+                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold px-2 sm:px-3 py-0.5 sm:py-1 text-[9px] sm:text-xs shrink-0 self-start sm:self-auto">
                           👑 {admin.role}
                         </Badge>
                       </div>
@@ -1108,58 +1106,58 @@ export default function AdminDashboardPage() {
 
           {/* EVENTS TAB */}
           {activeTab === "events" && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Manage Events</h1>
-                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>View, create, edit, or update status of IceBreaking event activities.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Manage Events</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">View, create, edit, or update status of IceBreaking event activities.</p>
                 </div>
                 <button
                   onClick={() => handleOpenEventModal()}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center gap-2"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
                 >
                   ➕ Create New Event
                 </button>
               </div>
 
-              <div style={{ display: "grid", gap: "20px" }}>
+              <div className="grid gap-4">
                 {eventsList.length > 0 ? (
                   eventsList.map((evt: any) => (
-                    <Card key={evt.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-blue-500/40 p-6">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 font-extrabold text-[11px] px-2.5 py-0.5">
+                    <Card key={evt.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-blue-500/40 p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 font-extrabold text-[10px] sm:text-[11px] px-2.5 py-0.5">
                               {evt.category || "General"}
                             </Badge>
-                            <Badge className={evt.status === "live" || evt.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-[11px]"}>
+                            <Badge className={evt.status === "live" || evt.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-[10px] sm:text-[11px]"}>
                               ● {(evt.status || "upcoming").toUpperCase()}
                             </Badge>
                           </div>
-                          <h3 style={{ margin: "0 0 8px", fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>{evt.title}</h3>
-                          {evt.description && <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: "0.9rem", lineHeight: 1.5 }}>{evt.description}</p>}
-                          <div style={{ display: "flex", gap: "18px", fontSize: "0.82rem", color: "#cbd5e1", fontWeight: 600 }}>
+                          <h3 className="m-0 text-base sm:text-xl font-black text-white">{evt.title}</h3>
+                          {evt.description && <p className="m-0 text-slate-400 text-xs sm:text-sm leading-relaxed">{evt.description}</p>}
+                          <div className="flex items-center gap-4 text-xs text-slate-300 font-semibold flex-wrap">
                             {evt.date && <span>📅 {evt.date}</span>}
                             {evt.venue && <span>📍 {evt.venue}</span>}
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", gap: "10px" }}>
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                           <button
                             onClick={() => handleToggleEventStatus(evt)}
-                            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
+                            className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
                           >
                             {evt.status === "live" || evt.status === "active" ? "Pause/Upcoming" : "Set Live"}
                           </button>
                           <button
                             onClick={() => handleOpenEventModal(evt)}
-                            className="px-3.5 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 font-bold text-xs transition-all"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => handleDeleteEvent(evt)}
-                            className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
                           </button>
@@ -1184,21 +1182,21 @@ export default function AdminDashboardPage() {
 
           {/* POLLS TAB */}
           {activeTab === "polls" && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Polls Management</h1>
-                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Create, edit, toggle active status, or delete audience polls.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Polls Management</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">Create, edit, toggle active status, or delete audience polls.</p>
                 </div>
                 <button
                   onClick={() => handleOpenPollModal()}
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center gap-2"
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
                 >
                   ➕ Create New Poll
                 </button>
               </div>
 
-              <div style={{ display: "grid", gap: "20px" }}>
+              <div className="grid gap-4">
                 {pollsList.length > 0 ? (
                   pollsList.map((poll) => {
                     const totalVotes = poll.options
@@ -1206,36 +1204,36 @@ export default function AdminDashboardPage() {
                       : poll.totalVotes || 0;
 
                     return (
-                      <Card key={poll.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-violet-500/40 p-6">
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                          <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                              <Badge className={poll.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[11px]"}>
+                      <Card key={poll.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-violet-500/40 p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className={poll.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[10px] sm:text-[11px]"}>
                                 {poll.status === "active" ? "🟢 Active Poll" : "🔴 Closed"}
                               </Badge>
-                              <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontWeight: 700 }}>Total Votes: {totalVotes}</span>
+                              <span className="text-xs text-slate-400 font-bold">Total Votes: {totalVotes}</span>
                             </div>
-                            <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>
+                            <h3 className="m-0 text-base sm:text-xl font-black text-white">
                               {poll.question}
                             </h3>
                           </div>
 
-                          <div style={{ display: "flex", gap: "10px" }}>
+                          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                             <button
                               onClick={() => handleTogglePollStatus(poll)}
-                              className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
+                              className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
                             >
                               {poll.status === "active" ? "Pause/Close" : "Set Active"}
                             </button>
                             <button
                               onClick={() => handleOpenPollModal(poll)}
-                              className="px-3.5 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 font-bold text-xs transition-all"
+                              className="px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 font-bold text-xs transition-all"
                             >
                               ✏️ Edit
                             </button>
                             <button
                               onClick={() => handleDeletePoll(poll)}
-                              className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
+                              className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                             >
                               🗑️ Delete
                             </button>
@@ -1280,61 +1278,61 @@ export default function AdminDashboardPage() {
 
           {/* QUIZZES TAB */}
           {activeTab === "quizzes" && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 900, margin: "0 0 4px", letterSpacing: "-0.02em" }}>Quiz Management</h1>
-                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Create, edit, toggle active status, or delete live event quizzes.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Quiz Management</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">Create, edit, toggle active status, or delete live event quizzes.</p>
                 </div>
                 <button
                   onClick={() => handleOpenQuizModal()}
-                  className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs px-5 py-3 rounded-xl transition-all shadow-lg shadow-pink-600/30 flex items-center gap-2"
+                  className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-pink-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
                 >
                   ➕ Create New Quiz
                 </button>
               </div>
 
-              <div style={{ display: "grid", gap: "20px" }}>
+              <div className="grid gap-4">
                 {quizzesList.length > 0 ? (
                   quizzesList.map((quiz) => (
-                    <Card key={quiz.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-pink-500/40 p-6">
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                            <Badge className={quiz.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[11px]"}>
+                    <Card key={quiz.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-pink-500/40 p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={quiz.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[10px] sm:text-[11px]"}>
                               {quiz.status === "active" ? "🟢 Active Quiz" : "🔴 Closed"}
                             </Badge>
-                            <Badge variant="outline" className="bg-slate-900 text-slate-300 border-slate-700 font-bold text-[11px]">
+                            <Badge variant="outline" className="bg-slate-900 text-slate-300 border-slate-700 font-bold text-[10px] sm:text-[11px]">
                               ⏱️ {quiz.timeLimit || 10} Mins
                             </Badge>
-                            <Badge variant="outline" className="bg-pink-500/10 text-pink-400 border-pink-500/30 font-bold text-[11px]">
-                              🏆 {quiz.totalPoints || 0} Total Points
+                            <Badge variant="outline" className="bg-pink-500/10 text-pink-400 border-pink-500/30 font-bold text-[10px] sm:text-[11px]">
+                              🏆 {quiz.totalPoints || 0} Points
                             </Badge>
                           </div>
-                          <h3 style={{ margin: "0 0 6px", fontSize: "1.25rem", fontWeight: 900, color: "#ffffff" }}>
+                          <h3 className="m-0 text-base sm:text-xl font-black text-white">
                             {quiz.title}
                           </h3>
                           {quiz.description && (
-                            <p style={{ color: "#94a3b8", fontSize: "0.9rem", margin: 0, lineHeight: 1.5 }}>{quiz.description}</p>
+                            <p className="text-slate-400 text-xs sm:text-sm m-0 leading-relaxed">{quiz.description}</p>
                           )}
                         </div>
 
-                        <div style={{ display: "flex", gap: "10px" }}>
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                           <button
                             onClick={() => handleToggleQuizStatus(quiz)}
-                            className="px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all"
+                            className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
                           >
                             {quiz.status === "active" ? "Pause/Close" : "Set Active"}
                           </button>
                           <button
                             onClick={() => handleOpenQuizModal(quiz)}
-                            className="px-3.5 py-2 rounded-xl bg-pink-500/15 border border-pink-500/30 text-pink-300 hover:bg-pink-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-pink-500/15 border border-pink-500/30 text-pink-300 hover:bg-pink-500/25 font-bold text-xs transition-all"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => handleDeleteQuiz(quiz)}
-                            className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
                           </button>
@@ -1374,34 +1372,21 @@ export default function AdminDashboardPage() {
 
           {/* USERS TAB */}
           {activeTab === "users" && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 style={{ fontSize: "1.8rem", fontWeight: 800, margin: "0 0 4px" }}>Registered Participants</h1>
-                  <p style={{ color: "#94a3b8", fontSize: "0.95rem", margin: 0 }}>Manage event participant registrations, scores, and entries in Firestore.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Registered Participants</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">Manage event participant registrations, scores, and entries in Firestore.</p>
                 </div>
                 <button
                   onClick={() => handleOpenParticipantModal()}
-                  style={{
-                    background: "linear-gradient(135deg, #7c3aed, #3b82f6)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    fontWeight: 700,
-                    fontSize: "0.9rem",
-                    cursor: "pointer",
-                    boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                  }}
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
                 >
                   ➕ Add New Participant
                 </button>
               </div>
 
-              <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 backdrop-blur-2xl shadow-xl">
+              <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-4 sm:p-6 backdrop-blur-2xl shadow-xl">
                 {participantsList.length > 0 ? (
                   <div className="space-y-3">
                     {participantsList.map((u) => {
@@ -1410,29 +1395,29 @@ export default function AdminDashboardPage() {
                       return (
                         <div
                           key={u.id}
-                          className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all flex-wrap gap-3"
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all gap-3"
                         >
                           <div>
-                            <h4 className="text-base font-bold text-white m-0 leading-snug">
+                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">
                               {pName}
                             </h4>
-                            <span className="text-xs font-mono text-violet-400 font-semibold block mt-0.5">
+                            <span className="text-[11px] sm:text-xs font-mono text-violet-400 font-semibold block mt-0.5">
                               Reg #: {pReg}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/30 font-extrabold text-xs px-3 py-1">
+                          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                            <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/30 font-extrabold text-[10px] sm:text-xs px-2.5 sm:px-3 py-1">
                               ⭐ {u.totalScore || 0} PTS
                             </Badge>
                             <button
                               onClick={() => handleOpenParticipantModal(u)}
-                              className="px-3.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30 font-bold text-xs transition-all cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30 font-bold text-xs transition-all cursor-pointer"
                             >
                               ✏️ Edit
                             </button>
                             <button
                               onClick={() => handleDeleteParticipant(u.id, pName)}
-                              className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 font-bold text-xs transition-all cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 font-bold text-xs transition-all cursor-pointer"
                             >
                               🗑️ Delete
                             </button>
@@ -1442,7 +1427,7 @@ export default function AdminDashboardPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-slate-400 text-center py-6">No registered participants found in Firestore collection &apos;participants&apos;.</p>
+                  <p className="text-slate-400 text-center py-6 text-xs sm:text-sm">No registered participants found in Firestore collection &apos;participants&apos;.</p>
                 )}
               </div>
             </div>

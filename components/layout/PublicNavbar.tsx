@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import Image from "next/image";
-import { Info, Menu, X, Volume2, VolumeX } from "lucide-react";
+import { Info, Volume2, VolumeX } from "lucide-react";
 import { useAudio } from "@/contexts/AudioContext";
 
 interface PublicNavbarProps {
@@ -12,7 +11,6 @@ interface PublicNavbarProps {
 }
 
 export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const audio = useAudio();
 
   const isMuted = muted !== undefined ? muted : audio?.muted;
@@ -62,15 +60,7 @@ export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
               className="desktop-nav"
               style={{ display: "flex", alignItems: "center", gap: "24px", marginRight: "8px" }}
             >
-              <style>{`
-                @media (max-width: 768px) {
-                  .desktop-nav { display: none !important; }
-                  .mobile-menu-btn { display: flex !important; }
-                }
-                @media (min-width: 769px) {
-                  .mobile-menu-btn { display: none !important; }
-                }
-              `}</style>
+
 
               {/* About Link */}
               <Link
@@ -140,67 +130,9 @@ export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
                 {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
             )}
-
-            {/* Mobile Menu Toggle Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="mobile-menu-btn"
-              style={{
-                background: "rgba(255, 255, 255, 0.12)",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                borderRadius: "50%",
-                width: "36px",
-                height: "36px",
-                padding: "0",
-                color: "#ffffff",
-                cursor: "pointer",
-                alignItems: "center",
-                justifyContent: "center",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-              }}
-              aria-label="Toggle navigation menu"
-            >
-              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
           </div>
         </div>
       </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div
-          style={{
-            backgroundColor: "rgba(10, 12, 18, 0.96)",
-            backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)",
-            padding: "18px 24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            marginTop: "10px",
-          }}
-        >
-          <Link
-            href="/about"
-            onClick={() => setMobileMenuOpen(false)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              color: "#f8fafc",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            <Info size={18} />
-            About
-          </Link>
-
-
-        </div>
-      )}
     </header>
   );
 }
