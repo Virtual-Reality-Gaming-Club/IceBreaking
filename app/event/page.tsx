@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot, query, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, doc, getDoc, updateDoc } from "firebase/firestore";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import Link from "next/link";
@@ -106,20 +106,47 @@ export default function EventsHubPage() {
     };
   }, []);
 
-  const handleManualLogin = (e: React.FormEvent) => {
+  const [verifying, setVerifying] = useState(false);
+
+  const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputReg.trim()) {
       setInputError("Please enter your registration number (e.g. 25BCY10001).");
       return;
     }
     const normalized = inputReg.trim().toUpperCase();
-    try {
-      localStorage.setItem("ib_reg_number", normalized);
-    } catch {
-      // ignore
-    }
-    setRegNumber(normalized);
+    setVerifying(true);
     setInputError(null);
+
+    try {
+      // Query Firestore participants collection to verify registration
+      const participantRef = doc(db, "participants", normalized);
+      const participantSnap = await getDoc(participantRef);
+
+      if (!participantSnap.exists()) {
+        setInputError(`Registration Number '${normalized}' was not found. Please register first to enter!`);
+        setVerifying(false);
+        return;
+      }
+
+      const participantData = participantSnap.data();
+      const pName = participantData?.fullName || "";
+
+      try {
+        localStorage.setItem("ib_reg_number", normalized);
+        if (pName) localStorage.setItem("ib_full_name", pName);
+      } catch {
+        // ignore
+      }
+
+      setRegNumber(normalized);
+      setFullName(pName);
+    } catch (err: any) {
+      console.error("Verification error:", err);
+      setInputError("Unable to verify registration. Please check your internet connection.");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const handleSwitchUser = () => {
@@ -221,19 +248,21 @@ export default function EventsHubPage() {
 
               <button
                 type="submit"
+                disabled={verifying}
                 style={{
                   padding: "14px 20px",
-                  background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
+                  background: verifying ? "#4b5563" : "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
                   border: "none",
                   borderRadius: "12px",
                   color: "#ffffff",
                   fontSize: "0.95rem",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: verifying ? "not-allowed" : "pointer",
                   boxShadow: "0 4px 16px rgba(124, 58, 237, 0.4)",
+                  opacity: verifying ? 0.7 : 1,
                 }}
               >
-                Enter Event Hub →
+                {verifying ? "🔍 Verifying Registration..." : "Enter Event Hub →"}
               </button>
             </form>
 
