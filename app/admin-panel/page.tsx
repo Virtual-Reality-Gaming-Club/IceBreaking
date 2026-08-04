@@ -13,7 +13,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { VideoBackground } from "@/components/ui/VideoBackground";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Brain } from "lucide-react";
 
 interface EventItem {
   id: string;
@@ -60,8 +60,9 @@ export default function AdminDashboardPage() {
   const [eventsList, setEventsList] = useState<EventItem[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools">("overview");
 
-  // Global Registration Toggle State
+  // Global Settings State
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [globalQuizOpen, setGlobalQuizOpen] = useState(false);
 
   // Poll Form State
   const [pollModalOpen, setPollModalOpen] = useState(false);
@@ -183,13 +184,18 @@ export default function AdminDashboardPage() {
     // 5. Registration Settings Realtime
     const unsubRegistration = onSnapshot(doc(db, "settings", "registration"), (docSnap) => {
       if (docSnap.exists()) {
-        setRegistrationOpen(Boolean(docSnap.data()?.isOpen));
-      } else {
-        setRegistrationOpen(true);
+        setRegistrationOpen(!!docSnap.data().isOpen);
       }
     });
 
-    // 6. Leaderboard Teams
+    // 6. Global Quiz Toggle Realtime
+    const unsubQuizToggle = onSnapshot(doc(db, "settings", "quiz"), (docSnap) => {
+      if (docSnap.exists()) {
+        setGlobalQuizOpen(!!docSnap.data().isOpen);
+      }
+    });
+
+    // 7. Leaderboard Teams
     const unsubLeaderboard = onSnapshot(collection(db, "leaderboard"), (snap) => {
       setStats(s => ({ ...s, totalTeams: snap.size }));
     });
@@ -206,6 +212,7 @@ export default function AdminDashboardPage() {
       unsubPolls();
       unsubQuizzes();
       unsubRegistration();
+      unsubQuizToggle();
       unsubLeaderboard();
     };
   }, [isAdmin]);
@@ -229,6 +236,20 @@ export default function AdminDashboardPage() {
     } catch (err) {
       console.error("Error toggling registration status:", err);
       alert("Failed to update registration status.");
+    }
+  };
+
+  const handleToggleGlobalQuiz = async () => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      await setDoc(doc(db, "settings", "quiz"), {
+        isOpen: !globalQuizOpen,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      alert(`Global Quiz is now ${!globalQuizOpen ? 'OPEN' : 'CLOSED'} for all users`);
+    } catch (err) {
+      console.error("Error toggling global quiz:", err);
+      alert("Failed to toggle global quiz.");
     }
   };
 
@@ -1289,91 +1310,42 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Quiz Management</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">Create, edit, toggle active status, or delete live event quizzes.</p>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">Easily toggle the static hardcoded quiz for all users.</p>
                 </div>
+              </div>
+
+              <Card className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl p-6 sm:p-10 text-center max-w-2xl mx-auto">
+                <div className="mb-6">
+                  <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 ${globalQuizOpen ? 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]' : 'bg-red-500/20 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.3)]'}`}>
+                    <Brain size={40} />
+                  </div>
+                  <h3 className="text-2xl font-black text-white mb-2">Global Quiz Access</h3>
+                  <p className="text-slate-400 text-sm max-w-md mx-auto">
+                    Toggle this to open or close the hardcoded local quiz for all active participants on the user side.
+                  </p>
+                </div>
+                
                 <button
-                  onClick={() => handleOpenQuizModal()}
-                  className="bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-pink-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
+                  onClick={handleToggleGlobalQuiz}
+                  className={`px-8 py-4 rounded-xl font-black text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-3 w-full sm:w-auto mx-auto ${
+                    globalQuizOpen
+                      ? "bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300"
+                      : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30"
+                  }`}
                 >
-                  ➕ Create New Quiz
+                  {globalQuizOpen ? (
+                    <>
+                      <div className="text-rose-400">🔒</div>
+                      <span>Close Quiz for Users</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-emerald-400">🔓</div>
+                      <span>Open Quiz for Users</span>
+                    </>
+                  )}
                 </button>
-              </div>
-
-              <div className="grid gap-4">
-                {quizzesList.length > 0 ? (
-                  quizzesList.map((quiz) => (
-                    <Card key={quiz.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-pink-500/40 p-4 sm:p-6">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
-                        <div className="space-y-1.5">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Badge className={quiz.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[10px] sm:text-[11px]"}>
-                              {quiz.status === "active" ? "🟢 Active Quiz" : "🔴 Closed"}
-                            </Badge>
-                            <Badge variant="outline" className="bg-slate-900 text-slate-300 border-slate-700 font-bold text-[10px] sm:text-[11px]">
-                              ⏱️ {quiz.timeLimit || 10} Mins
-                            </Badge>
-                            <Badge variant="outline" className="bg-pink-500/10 text-pink-400 border-pink-500/30 font-bold text-[10px] sm:text-[11px]">
-                              🏆 {quiz.totalPoints || 0} Points
-                            </Badge>
-                          </div>
-                          <h3 className="m-0 text-base sm:text-xl font-black text-white">
-                            {quiz.title}
-                          </h3>
-                          {quiz.description && (
-                            <p className="text-slate-400 text-xs sm:text-sm m-0 leading-relaxed">{quiz.description}</p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-                          <button
-                            onClick={() => handleToggleQuizStatus(quiz)}
-                            className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
-                          >
-                            {quiz.status === "active" ? "Pause/Close" : "Set Active"}
-                          </button>
-                          <button
-                            onClick={() => handleOpenQuizModal(quiz)}
-                            className="px-3 py-2 rounded-xl bg-pink-500/15 border border-pink-500/30 text-pink-300 hover:bg-pink-500/25 font-bold text-xs transition-all"
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteQuiz(quiz)}
-                            className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Quiz Questions Preview */}
-                      <div className="mt-4 bg-slate-900/60 border border-slate-800/80 rounded-xl p-4">
-                        <h4 className="m-0 mb-3 text-xs uppercase tracking-wider font-extrabold text-violet-300">
-                          Questions ({quiz.questions?.length || 0})
-                        </h4>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {quiz.questions?.map((q: any, idx: number) => (
-                            <div key={idx} style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>
-                              <strong className="text-white">Q{idx + 1}:</strong> {q.question}{" "}
-                              <span style={{ color: "#4ade80", fontSize: "0.78rem", fontWeight: 700 }}>({q.points || 10} pts)</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </Card>
-                  ))
-                ) : (
-                  <Card className="bg-slate-950/60 border-dashed border-slate-800 p-10 text-center">
-                    <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No active or created quizzes yet.</p>
-                    <button
-                      onClick={() => handleOpenQuizModal()}
-                      className="bg-pink-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
-                    >
-                      Create First Quiz
-                    </button>
-                  </Card>
-                )}
-              </div>
+              </Card>
             </div>
           )}
 

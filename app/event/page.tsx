@@ -9,6 +9,7 @@ import { VideoBackground } from "@/components/ui/VideoBackground";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { quizData } from "@/quizcontent/data";
 import { 
   Gamepad2, 
   Vote, 
@@ -58,7 +59,7 @@ interface ParticipantItem {
 export default function UserPanelPage() {
   const [liveEvents, setLiveEvents] = useState<EventItem[]>([]);
   const [polls, setPolls] = useState<PollItem[]>([]);
-  const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([{ id: "local_quiz", title: "Icebreaking Ultimate Trivia", description: "Test your gaming and pop culture knowledge!", status: "active" }]);
   const [leaderboard, setLeaderboard] = useState<ParticipantItem[]>([]);
 
   // Participant session state
@@ -149,17 +150,20 @@ export default function UserPanelPage() {
       setPolls(raw);
     });
 
-    const unsubQuizzes = onSnapshot(query(collection(db, "quizzes")), (snapshot) => {
-      const raw: QuizItem[] = [];
-      snapshot.docs.forEach((d) => raw.push({ id: d.id, ...d.data() } as QuizItem));
-      setQuizzes(raw.filter((q) => q.status === "active"));
+    const unsubQuizToggle = onSnapshot(doc(db, "settings", "quiz"), (docSnap) => {
+      if (docSnap.exists()) {
+        const isOpen = !!docSnap.data().isOpen;
+        setQuizzes(isOpen ? [{ id: "local_quiz", title: "Icebreaking Ultimate Trivia", description: "Test your gaming and pop culture knowledge!", status: "active", totalPoints: 15 }] : []);
+      } else {
+        setQuizzes([]);
+      }
     });
 
     return () => {
       unsubParticipants();
       unsubEvents();
       unsubPolls();
-      unsubQuizzes();
+      unsubQuizToggle();
     };
   }, [regNumber, fullName]);
 
@@ -250,9 +254,9 @@ export default function UserPanelPage() {
   const handleQuizSubmit = async () => {
     if (!activeQuiz) return;
     let earnedPoints = 0;
-    activeQuiz.questions.forEach((q, idx) => {
+    quizData.forEach((q, idx) => {
       if (userAnswers[idx] === q.correctAnswerIndex) {
-        earnedPoints += q.points || 10;
+        earnedPoints += q.points || 1;
       }
     });
 
@@ -638,16 +642,16 @@ export default function UserPanelPage() {
 
                             {!quizSubmitted ? (
                               <div className="space-y-5">
-                                {activeQuiz.questions.map((q, qIdx) => (
+                                {quizData.map((q, qIdx) => (
                                   <div key={q.id || qIdx} className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md">
-                                    <h4 className="text-xs font-bold text-white mb-3 leading-relaxed">
+                                    <h4 className="text-sm font-bold text-white mb-4 leading-relaxed">
                                       {qIdx + 1}. {q.question}
                                     </h4>
-                                    <div className="space-y-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                       {q.options.map((opt, oIdx) => (
                                         <label
                                           key={oIdx}
-                                          className={`flex items-center gap-3 p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                                          className={`flex items-center gap-3 p-4 rounded-xl border text-sm font-semibold cursor-pointer transition-all ${
                                             userAnswers[qIdx] === oIdx
                                               ? "bg-purple-500/20 border-purple-400 text-white shadow-md shadow-purple-950/40"
                                               : "bg-white/[0.02] border-white/[0.08] text-slate-300 hover:border-white/20"
@@ -658,9 +662,15 @@ export default function UserPanelPage() {
                                             name={`arena_q_${qIdx}`}
                                             checked={userAnswers[qIdx] === oIdx}
                                             onChange={() => setUserAnswers({ ...userAnswers, [qIdx]: oIdx })}
-                                            className="accent-purple-400"
+                                            className="accent-purple-400 w-4 h-4 shrink-0"
                                           />
-                                          <span>{opt}</span>
+                                          {opt.endsWith(".png") || opt.endsWith(".jpg") ? (
+                                            <div className="w-full flex justify-center bg-black/40 rounded-lg overflow-hidden p-2 border border-white/5">
+                                              <img src={opt} alt={`Option ${oIdx + 1}`} className="max-h-32 object-contain" />
+                                            </div>
+                                          ) : (
+                                            <span>{opt}</span>
+                                          )}
                                         </label>
                                       ))}
                                     </div>
@@ -679,7 +689,7 @@ export default function UserPanelPage() {
                                 <div className="text-4xl mb-2">🏆</div>
                                 <h3 className="text-xl font-black text-purple-400 mb-1">Quiz Completed!</h3>
                                 <p className="text-slate-300 text-xs mb-5">
-                                  You scored <strong className="text-purple-300 text-base">{quizScore}</strong> out of {activeQuiz.totalPoints} points!
+                                  You scored <strong className="text-purple-300 text-base">{quizScore}</strong> out of {quizData.reduce((acc, q) => acc + (q.points || 1), 0)} points!
                                 </p>
                                 <button
                                   onClick={() => setActiveQuiz(null)}
