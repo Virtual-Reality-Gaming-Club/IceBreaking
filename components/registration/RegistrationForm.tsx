@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { normalizeName, normalizeRegNumber, isValidName, isValidRegNumber } from "@/utils/validation";
 import { Button, Input } from "@/components/ui/forms";
 
 export function RegistrationForm() {
+  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -146,20 +148,38 @@ export function RegistrationForm() {
           </span>
         </div>
 
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => setRegisteredUser(null)}
-          style={{
-            width: "100%",
-            padding: "14px",
-            fontSize: "1rem",
-            fontWeight: 700,
-            borderRadius: "12px",
-          }}
-        >
-          ← Register Another Participant
-        </Button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "100%" }}>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => router.push("/event")}
+            style={{
+              width: "100%",
+              padding: "16px",
+              fontSize: "1.05rem",
+              fontWeight: 800,
+              borderRadius: "14px",
+              boxShadow: "0 6px 20px rgba(124, 58, 237, 0.5)",
+            }}
+          >
+            Continue to Event Hub →
+          </Button>
+
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setRegisteredUser(null)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              borderRadius: "12px",
+            }}
+          >
+            Register Another Participant
+          </Button>
+        </div>
       </div>
     );
   }

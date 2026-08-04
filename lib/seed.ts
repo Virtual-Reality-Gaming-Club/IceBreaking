@@ -7,29 +7,7 @@ export async function seedFirestore() {
   try {
     const now = new Date().toISOString();
 
-    // ─── 1. Seed Event Config ─────────────────────────────────────────────────
-    await setDoc(doc(db, "event", "config"), {
-      name: "IceBreaking 2026",
-      description: "Welcome to IceBreaking 2026 organized by Virtual Reality & Gaming Club (VRGC).",
-      date: "2026-08-15",
-      time: "10:00",
-      venue: "Auditorium / Lab Hall",
-      features: {
-        registration: true,
-        polls: true,
-        quiz: true,
-        activities: true,
-      },
-      rules: [
-        "Be respectful to all participants and organizers.",
-        "Ensure your registration details are accurate.",
-        "Have fun and engage in all icebreaking activities!",
-      ],
-      updatedAt: now,
-    });
-    console.log("✅ 'event/config' document seeded.");
-
-    // ─── 2. Seed Participants Collection ──────────────────────────────────────
+    // ─── 1. Seed Participants Collection ──────────────────────────────────────
     const sampleParticipants = [
       {
         registrationNumber: "25BCY10001",
@@ -45,7 +23,7 @@ export async function seedFirestore() {
     }
     console.log("✅ 'participants' collection seeded.");
 
-    // ─── 3. Seed Scoring Rules Collection ────────────────────────────────────
+    // ─── 2. Seed Scoring Rules Collection ────────────────────────────────────
     const sampleRules = [
       {
         id: "sample_rule_1",
@@ -70,7 +48,7 @@ export async function seedFirestore() {
     }
     console.log("✅ 'scoringRules' collection seeded.");
 
-    // ─── 4. Seed Score Entries Collection ─────────────────────────────────────
+    // ─── 3. Seed Score Entries Collection ─────────────────────────────────────
     await setDoc(doc(db, "scoreEntries", "sample_score_1"), {
       id: "sample_score_1",
       registrationNumber: "25BCY10001",
@@ -83,7 +61,7 @@ export async function seedFirestore() {
     });
     console.log("✅ 'scoreEntries' collection seeded.");
 
-    // ─── 5. Seed Polls Collection ─────────────────────────────────────────────
+    // ─── 4. Seed Polls Collection ─────────────────────────────────────────────
     await setDoc(doc(db, "polls", "sample_poll_1"), {
       id: "sample_poll_1",
       question: "Which event area are you most excited about?",
@@ -98,10 +76,51 @@ export async function seedFirestore() {
     });
     console.log("✅ 'polls' collection seeded.");
 
-    // ─── 6. Seed Activity Logs Collection ────────────────────────────────────
+    // ─── 5. Seed Quizzes Collection ───────────────────────────────────────────
+    await setDoc(doc(db, "quizzes", "sample_quiz_1"), {
+      id: "sample_quiz_1",
+      title: "VR Gaming & Tech Trivia",
+      description: "Test your knowledge on VR technology, gaming history, and VRGC events!",
+      status: "active",
+      timeLimit: 10,
+      totalPoints: 20,
+      questions: [
+        {
+          id: "q1",
+          question: "What does VR stand for?",
+          options: ["Virtual Reality", "Visual Response", "Variable Rate", "Vector Rotation"],
+          correctAnswerIndex: 0,
+          points: 10,
+        },
+        {
+          id: "q2",
+          question: "Which game engine is widely used for VR game development?",
+          options: ["Photoshop", "Unreal Engine", "MS Paint", "Excel"],
+          correctAnswerIndex: 1,
+          points: 10,
+        },
+      ],
+      createdAt: now,
+    });
+    console.log("✅ 'quizzes' collection seeded.");
+
+    // ─── 6. Seed Events Collection ────────────────────────────────────────────
+    await setDoc(doc(db, "events", "sample_event_1"), {
+      id: "sample_event_1",
+      title: "Icebreaking Games",
+      category: "Icebreaker Games",
+      status: "live",
+      date: "aug 6, 2:30 pm",
+      venue: "Auditorium Hall",
+      description: "Interactive gaming and team icebreaking activities.",
+      createdAt: now,
+    });
+    console.log("✅ 'events' collection seeded.");
+
+    // ─── 7. Seed Activity Logs Collection ────────────────────────────────────
     await setDoc(doc(db, "activityLogs", "sample_log_1"), {
       id: "sample_log_1",
-      activity: "EVENT_UPDATED",
+      activity: "SYSTEM_INITIALIZED",
       description: "Initial database seed created successfully.",
       adminEmail: "jaiyansh.25bcy10268@vitbhopal.ac.in",
       timestamp: now,
@@ -112,8 +131,8 @@ export async function seedFirestore() {
       success: true,
       message: "Firestore database seeded successfully with all collections!",
       collections: [
-        "event/config", "participants", "scoringRules",
-        "scoreEntries", "polls", "activityLogs",
+        "events", "participants", "scoringRules",
+        "scoreEntries", "polls", "quizzes", "activityLogs",
       ],
     };
   } catch (error: any) {
@@ -121,3 +140,6 @@ export async function seedFirestore() {
     return { success: false, error: error.message };
   }
 }
+
+
+

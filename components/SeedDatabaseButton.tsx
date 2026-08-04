@@ -4,8 +4,8 @@ import { useState } from "react";
 import { seedFirestore } from "@/lib/seed";
 
 const SEED_COLLECTIONS = [
-  "event/config", "participants", "scoringRules",
-  "scoreEntries", "polls", "activityLogs",
+  "events", "participants", "scoringRules",
+  "scoreEntries", "polls", "quizzes", "activityLogs",
 ];
 
 export function SeedDatabaseButton() {

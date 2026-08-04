@@ -91,6 +91,25 @@ export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
                 About
               </Link>
 
+              {/* Event Hub Link */}
+              <Link
+                href="/event"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  color: "#a78bfa",
+                  fontSize: "0.9rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  transition: "color 0.2s ease",
+                }}
+                className="hover:text-white"
+              >
+                🎮 Event Hub
+              </Link>
+
+
             </nav>
 
             {/* Voice Toggle Button — only shown on pages with the background video */}
