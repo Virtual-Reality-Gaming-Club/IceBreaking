@@ -23,27 +23,6 @@ export default function HomePage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", position: "relative" }}>
-      {/* Background Video */}
-      <video
-        autoPlay
-        loop
-        muted
-        playsInline
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          zIndex: -1,
-          pointerEvents: "none",
-          opacity: 0.6 // Adding slight opacity for readability, adjust as needed
-        }}
-      >
-        <source src="/hero-bg.mp4" type="video/mp4" />
-      </video>
-
       <PublicNavbar />
 
       <main style={{ flex: 1, padding: "100px 20px 50px", maxWidth: "780px", margin: "0 auto", width: "100%", position: "relative", zIndex: 10, display: "flex", flexDirection: "column", justifyContent: "center" }}>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import Image from "next/image";
 import { Info, Menu, X, Volume2, VolumeX } from "lucide-react";
-// import { useAudio } from "@/contexts/AudioContext";
+import { useAudio } from "@/contexts/AudioContext";
 
 interface PublicNavbarProps {
   muted?: boolean;
@@ -13,12 +13,11 @@ interface PublicNavbarProps {
 
 export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // const audio = useAudio();
-  const audio = { muted: true, toggleMute: () => {}, hasVideo: true };
+  const audio = useAudio();
 
-  const isMuted = muted !== undefined ? muted : audio.muted;
-  const handleToggleMute = onToggleMute || audio.toggleMute;
-  const showVoiceToggle = muted !== undefined ? true : audio.hasVideo;
+  const isMuted = muted !== undefined ? muted : audio?.muted;
+  const handleToggleMute = onToggleMute || audio?.toggleMute;
+  const showVoiceToggle = muted !== undefined ? true : audio?.hasVideo;
 
   return (
     <header
