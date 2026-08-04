@@ -5,7 +5,20 @@ import { db } from "@/lib/firebase";
 import { collection, onSnapshot, query, doc, getDoc, updateDoc } from "firebase/firestore";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
+import { VideoBackground } from "@/components/ui/VideoBackground";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { 
+  Gamepad2, 
+  Vote, 
+  Brain, 
+  Trophy, 
+  LogOut, 
+  Sparkles, 
+  CheckCircle2,
+  ChevronRight
+} from "lucide-react";
 
 interface EventItem {
   id: string;
@@ -35,39 +48,51 @@ interface QuizItem {
   questions: { id: string; question: string; options: string[]; correctAnswerIndex: number; points: number }[];
 }
 
-export default function EventsHubPage() {
+interface ParticipantItem {
+  id: string;
+  registrationNumber: string;
+  fullName: string;
+  totalScore?: number;
+}
+
+export default function UserPanelPage() {
   const [liveEvents, setLiveEvents] = useState<EventItem[]>([]);
   const [polls, setPolls] = useState<PollItem[]>([]);
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showActivities, setShowActivities] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<ParticipantItem[]>([]);
 
-  // Participant session from localStorage
+  // Participant session state
   const [regNumber, setRegNumber] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
+  const [userScore, setUserScore] = useState<number>(0);
+  const [userRank, setUserRank] = useState<number | string>("—");
 
-  // Manual sign-in input if no session
+  // Login verification input state
   const [inputReg, setInputReg] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
-  // Interactive Poll Choice Selection state
+  // Poll state
   const [selectedOptions, setSelectedOptions] = useState<{ [pollId: string]: number }>({});
   const [userVotes, setUserVotes] = useState<{ [pollId: string]: string }>({});
 
-  // Active Quiz State
+  // Quiz state
   const [activeQuiz, setActiveQuiz] = useState<QuizItem | null>(null);
   const [userAnswers, setUserAnswers] = useState<{ [qIdx: number]: number }>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
 
+  // Active Event Arena state
+  const [joinedEvent, setJoinedEvent] = useState<EventItem | null>(null);
+  const [eventSubTab, setEventSubTab] = useState<"polls" | "quizzes" | "leaderboard">("polls");
+
+  // Read stored credentials
   useEffect(() => {
     try {
       const storedReg = localStorage.getItem("ib_reg_number") || "";
       const storedName = localStorage.getItem("ib_full_name") || "";
       if (storedReg) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setRegNumber(storedReg);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFullName(storedName);
       }
     } catch {
@@ -75,24 +100,56 @@ export default function EventsHubPage() {
     }
   }, []);
 
-  // Realtime Listeners for Live Events, Polls & Quizzes
+  // Fetch Participant Score & Leaderboard Realtime
   useEffect(() => {
-    // 1. Events (ONLY Live events shown)
+    const unsubParticipants = onSnapshot(collection(db, "participants"), (snapshot) => {
+      const list: ParticipantItem[] = [];
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        list.push({
+          id: d.id,
+          registrationNumber: d.id,
+          fullName: data.fullName || "Participant",
+          totalScore: Number(data.totalScore) || 0,
+        });
+      });
+
+      // Sort descending by score
+      list.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+      setLeaderboard(list);
+
+      // Find current user stats
+      if (regNumber) {
+        const idx = list.findIndex((p) => p.registrationNumber.toUpperCase() === regNumber.toUpperCase());
+        if (idx !== -1) {
+          setUserScore(list[idx].totalScore || 0);
+          setUserRank(idx + 1);
+          if (!fullName && list[idx].fullName) {
+            setFullName(list[idx].fullName);
+          }
+        }
+      }
+    });
+
+    // Realtime Listeners for Events, Polls & Quizzes
     const unsubEvents = onSnapshot(query(collection(db, "events")), (snapshot) => {
       const raw: EventItem[] = [];
       snapshot.docs.forEach((d) => raw.push({ id: d.id, ...d.data() } as EventItem));
       setLiveEvents(raw.filter((e) => e.status === "live" || e.status === "active"));
-      setLoading(false);
     });
 
-    // 2. Polls
     const unsubPolls = onSnapshot(query(collection(db, "polls")), (snapshot) => {
       const raw: PollItem[] = [];
-      snapshot.docs.forEach((d) => raw.push({ id: d.id, ...d.data() } as PollItem));
-      setPolls(raw.filter((p) => p.status === "active" || p.status === "open"));
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        // Only include if status is explicitly active or open
+        if (data.status === "active" || data.status === "open") {
+          raw.push({ id: d.id, ...data } as PollItem);
+        }
+      });
+      setPolls(raw);
     });
 
-    // 3. Quizzes
     const unsubQuizzes = onSnapshot(query(collection(db, "quizzes")), (snapshot) => {
       const raw: QuizItem[] = [];
       snapshot.docs.forEach((d) => raw.push({ id: d.id, ...d.data() } as QuizItem));
@@ -100,18 +157,26 @@ export default function EventsHubPage() {
     });
 
     return () => {
+      unsubParticipants();
       unsubEvents();
       unsubPolls();
       unsubQuizzes();
     };
-  }, []);
+  }, [regNumber, fullName]);
 
-  const [verifying, setVerifying] = useState(false);
+  // Real-time tab auto-fallback if admin closes currently selected poll or quiz
+  useEffect(() => {
+    if (eventSubTab === "polls" && polls.length === 0 && quizzes.length > 0) {
+      setEventSubTab("quizzes");
+    } else if (eventSubTab === "quizzes" && quizzes.length === 0 && polls.length > 0) {
+      setEventSubTab("polls");
+    }
+  }, [polls.length, quizzes.length, eventSubTab]);
 
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputReg.trim()) {
-      setInputError("Please enter your registration number (e.g. 25BCY10001).");
+      setInputError("Please enter your Registration Number (e.g. 25BCY10001).");
       return;
     }
     const normalized = inputReg.trim().toUpperCase();
@@ -119,18 +184,17 @@ export default function EventsHubPage() {
     setInputError(null);
 
     try {
-      // Query Firestore participants collection to verify registration
       const participantRef = doc(db, "participants", normalized);
       const participantSnap = await getDoc(participantRef);
 
       if (!participantSnap.exists()) {
-        setInputError(`Registration Number '${normalized}' was not found. Please register first to enter!`);
+        setInputError(`Registration Number '${normalized}' was not found. Please register first!`);
         setVerifying(false);
         return;
       }
 
-      const participantData = participantSnap.data();
-      const pName = participantData?.fullName || "";
+      const pData = participantSnap.data();
+      const pName = pData?.fullName || "";
 
       try {
         localStorage.setItem("ib_reg_number", normalized);
@@ -141,9 +205,10 @@ export default function EventsHubPage() {
 
       setRegNumber(normalized);
       setFullName(pName);
+      setUserScore(Number(pData?.totalScore) || 0);
     } catch (err: any) {
       console.error("Verification error:", err);
-      setInputError("Unable to verify registration. Please check your internet connection.");
+      setInputError("Unable to verify registration. Check connection.");
     } finally {
       setVerifying(false);
     }
@@ -158,6 +223,8 @@ export default function EventsHubPage() {
     }
     setRegNumber("");
     setFullName("");
+    setUserScore(0);
+    setUserRank("—");
   };
 
   const handleCastVote = async (pollId: string) => {
@@ -181,7 +248,7 @@ export default function EventsHubPage() {
     }
   };
 
-  const handleQuizSubmit = () => {
+  const handleQuizSubmit = async () => {
     if (!activeQuiz) return;
     let earnedPoints = 0;
     activeQuiz.questions.forEach((q, idx) => {
@@ -189,671 +256,445 @@ export default function EventsHubPage() {
         earnedPoints += q.points || 10;
       }
     });
+
     setQuizScore(earnedPoints);
     setQuizSubmitted(true);
+
+    if (regNumber && earnedPoints > 0) {
+      try {
+        const pRef = doc(db, "participants", regNumber.toUpperCase());
+        const pSnap = await getDoc(pRef);
+        if (pSnap.exists()) {
+          const currentTotal = Number(pSnap.data().totalScore) || 0;
+          await updateDoc(pRef, {
+            totalScore: currentTotal + earnedPoints,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error("Error updating participant total score:", err);
+      }
+    }
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#06070a", color: "#f8fafc", fontFamily: "system-ui, sans-serif" }}>
+    <div className="relative min-h-screen flex flex-col bg-[#060812] text-slate-100 font-sans overflow-x-hidden">
+      <VideoBackground />
       <PublicNavbar />
 
-      <main style={{ flex: 1, maxWidth: "880px", width: "100%", margin: "80px auto 60px", padding: "0 20px" }}>
-        {/* If no session, show exact Break folder registration prompt */}
+      <main className="relative z-10 flex-1 max-w-5xl w-full mx-auto px-4 pt-28 pb-16">
         {!regNumber ? (
-          <div
-            style={{
-              maxWidth: "500px",
-              margin: "40px auto",
-              background: "rgba(10, 13, 24, 0.92)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(124, 58, 237, 0.35)",
-              borderRadius: "24px",
-              padding: "36px 28px",
-              textAlign: "center",
-              boxShadow: "0 20px 45px rgba(0, 0, 0, 0.7), 0 0 30px rgba(124, 58, 237, 0.15)",
-            }}
-          >
-            <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>🎮</div>
-            <h1 style={{ fontSize: "1.6rem", fontWeight: 900, color: "#f8fafc", marginBottom: "8px" }}>
-              Join Event Activity Hub
-            </h1>
-            <p style={{ color: "#cbd5e1", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "24px", fontWeight: 500 }}>
-              Enter your Registration Number to participate in live activities.
+          /* LOGIN CARD IF NO SESSION */
+          <div className="max-w-md mx-auto my-12 p-8 rounded-3xl bg-white/[0.015] border border-white/10 backdrop-blur-3xl shadow-[0_0_60px_rgba(124,58,237,0.15)] text-center ring-1 ring-white/[0.05]">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-2xl shadow-lg shadow-violet-600/40">
+              🎮
+            </div>
+            <h1 className="text-2xl font-black text-white mb-2">User Event Panel</h1>
+            <p className="text-slate-400 text-sm mb-6">
+              Enter your Registration Number to access ongoing events and activities.
             </p>
 
-            <form onSubmit={handleManualLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <form onSubmit={handleManualLogin} className="flex flex-col gap-4">
               <input
                 type="text"
-                placeholder="Registration Number (e.g. 25BCY10001)"
+                placeholder="Reg Number (e.g. 25BCY10001)"
                 value={inputReg}
                 onChange={(e) => setInputReg(e.target.value.toUpperCase())}
-                style={{
-                  padding: "14px 18px",
-                  background: "rgba(15, 20, 35, 0.95)",
-                  border: "1.5px solid rgba(148, 163, 184, 0.45)",
-                  borderRadius: "12px",
-                  color: "#ffffff",
-                  fontSize: "1rem",
-                  textAlign: "center",
-                  fontWeight: 700,
-                  letterSpacing: "0.05em",
-                  outline: "none",
-                }}
+                className="w-full px-4 py-3.5 rounded-xl bg-white/[0.03] border border-white/10 focus:border-violet-400/60 text-white font-bold text-center text-base tracking-wider outline-none transition-all placeholder:text-slate-600 backdrop-blur-md"
               />
 
-              {inputError && (
-                <p style={{ color: "#f87171", fontSize: "0.85rem", margin: 0, fontWeight: 600 }}>{inputError}</p>
-              )}
+              {inputError && <p className="text-rose-400 text-xs font-semibold">{inputError}</p>}
 
               <button
                 type="submit"
                 disabled={verifying}
-                style={{
-                  padding: "14px 20px",
-                  background: verifying ? "#4b5563" : "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
-                  border: "none",
-                  borderRadius: "12px",
-                  color: "#ffffff",
-                  fontSize: "0.95rem",
-                  fontWeight: 700,
-                  cursor: verifying ? "not-allowed" : "pointer",
-                  boxShadow: "0 4px 16px rgba(124, 58, 237, 0.4)",
-                  opacity: verifying ? 0.7 : 1,
-                }}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-black text-sm shadow-lg shadow-violet-600/30 transition-all cursor-pointer disabled:opacity-50"
               >
-                {verifying ? "🔍 Verifying Registration..." : "Enter Event Hub →"}
+                {verifying ? "Verifying Session..." : "Access User Panel →"}
               </button>
             </form>
 
-            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-              <p style={{ color: "#cbd5e1", fontSize: "0.88rem", margin: "0 0 12px 0", fontWeight: 500 }}>
-                Not registered yet?
-              </p>
-              <Link
-                href="/register"
-                style={{
-                  display: "inline-block",
-                  color: "#a78bfa",
-                  fontSize: "0.9rem",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
-              >
-                Go to Registration Page ↗
+            <div className="mt-6 pt-5 border-t border-white/[0.08] flex items-center justify-center gap-2 text-xs text-slate-400">
+              <span>New Participant?</span>
+              <Link href="/register" className="text-violet-400 font-bold hover:underline">
+                Register Here ↗
               </Link>
             </div>
           </div>
         ) : (
-          /* Participant Active Hub - Matching Break Folder Layout */
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            {/* Player Profile Card */}
-            <div
-              style={{
-                background: "rgba(10, 13, 24, 0.92)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(124, 58, 237, 0.35)",
-                borderRadius: "20px",
-                padding: "22px 26px",
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "18px",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div
-                  style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "14px",
-                    background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: 900,
-                    fontSize: "1.3rem",
-                    color: "#fff",
-                    boxShadow: "0 0 20px rgba(124, 58, 237, 0.5)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {(fullName || regNumber || "P").charAt(0).toUpperCase()}
+          /* USER PANEL DASHBOARD */
+          <div className="flex flex-col gap-6">
+            
+            {/* PLAYER PROFILE BANNER */}
+            <div className="rounded-3xl bg-white/[0.015] border border-white/10 backdrop-blur-3xl p-6 shadow-[0_0_40px_rgba(124,58,237,0.10)] ring-1 ring-white/[0.05] flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-violet-600/40">
+                  {(fullName || regNumber).charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <h2 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 800, color: "#f8fafc" }}>
-                      {fullName || "Participant"}
-                    </h2>
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: "9999px",
-                        background: "rgba(124, 58, 237, 0.25)",
-                        border: "1px solid rgba(124, 58, 237, 0.4)",
-                        color: "#c4b5fd",
-                        fontSize: "0.75rem",
-                        fontWeight: 700,
-                        fontFamily: "monospace",
-                      }}
-                    >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-xl font-black text-white">{fullName || "Participant"}</h2>
+                    <Badge variant="outline" className="bg-violet-950/60 text-violet-300 border-violet-500/40 font-mono font-bold text-xs">
                       {regNumber}
-                    </span>
+                    </Badge>
                   </div>
-                  <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.82rem" }}>
-                    IceBreaking 2026 Participant
-                  </p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Glitch Fest 2026 Participant Roster</p>
                 </div>
               </div>
 
-              {/* Stats Pills */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                {/* Score */}
-                <div
-                  style={{
-                    background: "rgba(17, 20, 32, 0.8)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "12px",
-                    padding: "8px 16px",
-                    textAlign: "center",
-                  }}
-                >
-                  <span style={{ display: "block", fontSize: "0.68rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    Score
-                  </span>
-                  <span style={{ fontSize: "1.3rem", fontWeight: 900, color: "#38bdf8" }}>
-                    0 <span style={{ fontSize: "0.7rem", color: "#64748b" }}>PTS</span>
-                  </span>
+              {/* LIVE PLAYER STATS & ACTION BUTTONS */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md text-center">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Score</span>
+                  <span className="text-base font-black text-sky-400">{userScore} <span className="text-[10px] text-slate-500">PTS</span></span>
                 </div>
 
-                {/* Rank */}
-                <div
-                  style={{
-                    background: "rgba(17, 20, 32, 0.8)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    borderRadius: "12px",
-                    padding: "8px 16px",
-                    textAlign: "center",
-                  }}
-                >
-                  <span style={{ display: "block", fontSize: "0.68rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                    Rank
-                  </span>
-                  <span style={{ fontSize: "1.3rem", fontWeight: 900, color: "#a78bfa" }}>
-                    #—
-                  </span>
+                <div className="px-4 py-2 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md text-center">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rank</span>
+                  <span className="text-base font-black text-violet-400">#{userRank}</span>
                 </div>
 
-                {/* Switch button */}
                 <button
                   onClick={handleSwitchUser}
-                  style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    color: "#94a3b8",
-                    borderRadius: "10px",
-                    padding: "8px 12px",
-                    fontSize: "0.78rem",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  title="Switch Participant"
+                  className="p-2.5 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-white/20 hover:bg-white/[0.06] text-slate-400 hover:text-white transition-all cursor-pointer backdrop-blur-md"
+                  title="Switch Participant Session"
                 >
-                  Switch ⇄
+                  <LogOut size={18} />
                 </button>
               </div>
             </div>
 
-
-            {/* Live Activities Container */}
-            <div
-              style={{
-                background: "rgba(10, 13, 24, 0.92)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(124, 58, 237, 0.35)",
-                borderRadius: "20px",
-                padding: "24px",
-                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "5px 14px",
-                      borderRadius: "9999px",
-                      background: (liveEvents.length > 0 || polls.length > 0 || quizzes.length > 0) ? "rgba(34, 197, 94, 0.18)" : "rgba(148, 163, 184, 0.15)",
-                      border: (liveEvents.length > 0 || polls.length > 0 || quizzes.length > 0) ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(148, 163, 184, 0.3)",
-                      color: (liveEvents.length > 0 || polls.length > 0 || quizzes.length > 0) ? "#4ade80" : "#cbd5e1",
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.05em",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: "7px",
-                        height: "7px",
-                        borderRadius: "50%",
-                        backgroundColor: (liveEvents.length > 0 || polls.length > 0 || quizzes.length > 0) ? "#22c55e" : "#94a3b8",
-                        display: "inline-block",
-                      }}
-                    />
-                    {(liveEvents.length > 0 || polls.length > 0 || quizzes.length > 0) ? "LIVE ACTIVITY" : "EVENT STATUS"}
-                  </span>
-                </div>
-
-                <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>
-                  ⚡ Realtime Sync Active
-                </span>
+            {/* MAIN CONTENT AREA: ONGOING EVENTS */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                  <Gamepad2 className="text-sky-400" size={22} />
+                  <span>Ongoing Events</span>
+                </h3>
+                {liveEvents.length > 0 && (
+                  <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold text-xs animate-pulse">
+                    ● {liveEvents.length} LIVE NOW
+                  </Badge>
+                )}
               </div>
 
-              {/* Active UI Cards */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                {(liveEvents.length === 0 && polls.length === 0 && quizzes.length === 0) ? (
-                  <div
-                    style={{
-                      background: "rgba(10, 13, 24, 0.5)",
-                      backdropFilter: "blur(16px)",
-                      border: "1px dashed rgba(148, 163, 184, 0.2)",
-                      borderRadius: "20px",
-                      padding: "60px 20px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "3rem",
-                        marginBottom: "20px",
-                        filter: "drop-shadow(0 0 20px rgba(124, 58, 237, 0.4))",
-                      }}
-                    >
-                      ✨
+              {liveEvents.length === 0 ? (
+                <div className="p-12 rounded-3xl bg-white/[0.01] border border-dashed border-white/10 text-center backdrop-blur-2xl">
+                  <Sparkles className="mx-auto text-violet-400 mb-3 animate-pulse" size={36} />
+                  <h3 className="text-lg font-bold text-white mb-1">No Ongoing Events Right Now</h3>
+                  <p className="text-slate-400 text-sm max-w-md mx-auto">
+                    Admins will launch live icebreaker events here. When an event goes live, click Enter Event Arena to join!
+                  </p>
+                </div>
+              ) : (
+                liveEvents.map((evt) => (
+                  <Card key={evt.id} className="bg-white/[0.015] border-sky-400/20 p-6 backdrop-blur-3xl shadow-[0_0_30px_rgba(14,165,233,0.08)] hover:border-sky-400/40 hover:shadow-[0_0_40px_rgba(14,165,233,0.15)] transition-all ring-1 ring-white/[0.04]">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <Badge className="bg-sky-500/15 text-sky-300 border-sky-500/30 font-bold text-xs">
+                        {evt.category || "General Activity"}
+                      </Badge>
+                      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold text-[11px] animate-pulse">
+                        ● ONGOING NOW
+                      </Badge>
                     </div>
-                    <h3
-                      style={{
-                        color: "#f8fafc",
-                        fontSize: "1.5rem",
-                        fontWeight: 800,
-                        marginBottom: "10px",
-                      }}
-                    >
-                      Activities Coming Soon
-                    </h3>
-                    <p style={{ color: "#94a3b8", fontSize: "0.95rem", maxWidth: "340px", lineHeight: 1.6, margin: 0 }}>
-                      Hang tight! The host will activate polls, quizzes, and other live activities right here when it&apos;s time.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Live Event Activity Cards */}
-                    {liveEvents.map((evt) => {
-                      const hasSubActivities = polls.length > 0 || quizzes.length > 0;
 
-                      return (
-                        <div
-                          key={evt.id}
-                          style={{
-                            background: "rgba(15, 20, 35, 0.95)",
-                            border: "1.5px solid rgba(56, 189, 248, 0.45)",
-                            borderRadius: "18px",
-                            padding: "22px",
-                            boxShadow: "0 8px 25px rgba(0, 0, 0, 0.4)",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#bae6fd", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                              {evt.category || "Live Event Activity"}
-                            </span>
-                            <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4ade80", background: "rgba(34, 197, 94, 0.18)", border: "1px solid rgba(34, 197, 94, 0.4)", padding: "4px 10px", borderRadius: "9999px" }}>
-                              ● LIVE NOW
-                            </span>
-                          </div>
+                    <h3 className="text-xl font-black text-white mb-2">{evt.title}</h3>
+                    {evt.description && <p className="text-slate-300 text-sm leading-relaxed mb-4">{evt.description}</p>}
 
-                          <h3 style={{ color: "#ffffff", fontSize: "1.25rem", fontWeight: 800, margin: "0 0 10px 0" }}>
-                            {evt.title}
-                          </h3>
-                          {evt.description && (
-                            <p style={{ color: "#cbd5e1", fontSize: "0.92rem", lineHeight: 1.5, margin: "0 0 16px" }}>
-                              {evt.description}
-                            </p>
-                          )}
-
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.82rem", color: "#38bdf8", fontWeight: 600, paddingTop: "14px", borderTop: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap", gap: "10px" }}>
-                            <div style={{ display: "flex", gap: "16px" }}>
-                              {evt.date && <span>📅 {evt.date}</span>}
-                              {evt.venue && <span>📍 {evt.venue}</span>}
-                            </div>
-
-                            {hasSubActivities && (
-                              <button
-                                onClick={() => setShowActivities(!showActivities)}
-                                style={{
-                                  padding: "8px 16px",
-                                  background: showActivities ? "rgba(56, 189, 248, 0.25)" : "rgba(56, 189, 248, 0.15)",
-                                  border: "1px solid rgba(56, 189, 248, 0.4)",
-                                  borderRadius: "10px",
-                                  color: "#38bdf8",
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                  fontSize: "0.82rem",
-                                  transition: "all 0.2s",
-                                }}
-                              >
-                                {showActivities ? "Hide Activities ↑" : "Join Activity →"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-
-
-
-                {/* Active Polls & Quizzes (Shown when showActivities is true) */}
-                {showActivities && (
-                  <>
-                    {polls.map((poll, pollIdx) => {
-                      const hasVoted = Boolean(userVotes[poll.id]);
-                      const userVotedOptionId = userVotes[poll.id];
-                      const selectedOptIdx = selectedOptions[poll.id];
-                      const totalVotes = poll.options
-                        ? poll.options.reduce((sum, o) => sum + (o.votes || 0), 0)
-                        : poll.totalVotes || 0;
-
-                      return (
-                        <div
-                          key={poll.id}
-                          style={{
-                            background: "rgba(15, 20, 35, 0.95)",
-                            border: hasVoted
-                              ? "1.5px solid rgba(34, 197, 94, 0.45)"
-                              : "1.5px solid rgba(124, 58, 237, 0.45)",
-                            borderRadius: "18px",
-                            padding: "22px",
-                            boxShadow: "0 8px 25px rgba(0, 0, 0, 0.4)",
-                          }}
-                        >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#c4b5fd", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          Live Activity {polls.length > 1 ? `#${pollIdx + 1}` : ""}
-                        </span>
-                        {hasVoted && (
-                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#4ade80", background: "rgba(34, 197, 94, 0.18)", border: "1px solid rgba(34, 197, 94, 0.4)", padding: "4px 10px", borderRadius: "9999px" }}>
-                            ✓ Response Recorded
-                          </span>
-                        )}
+                    <div className="flex flex-wrap items-center justify-between pt-4 border-t border-slate-800/80 text-xs text-sky-400 font-semibold gap-3">
+                      <div className="flex items-center gap-4">
+                        {evt.date && <span>📅 {evt.date}</span>}
+                        {evt.venue && <span>📍 {evt.venue}</span>}
                       </div>
-
-                      <h3 style={{ color: "#ffffff", fontSize: "1.15rem", fontWeight: 800, margin: "0 0 18px 0", lineHeight: 1.45 }}>
-                        {poll.question}
-                      </h3>
-
-                      {hasVoted ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                          {poll.options.map((opt, optIdx) => {
-                            const optionLetter = String.fromCharCode(65 + optIdx);
-                            const count = opt.votes || 0;
-                            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
-                            const isMyChoice = userVotedOptionId === opt.id;
-
-                            return (
-                              <div
-                                key={opt.id || optIdx}
-                                style={{
-                                  background: isMyChoice ? "rgba(124, 58, 237, 0.25)" : "rgba(22, 27, 46, 0.95)",
-                                  border: isMyChoice ? "1.5px solid #a78bfa" : "1.5px solid rgba(148, 163, 184, 0.25)",
-                                  borderRadius: "14px",
-                                  padding: "14px 16px",
-                                }}
-                              >
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                    <span style={{ width: "24px", height: "24px", borderRadius: "6px", background: isMyChoice ? "#7c3aed" : "rgba(148, 163, 184, 0.2)", color: "#ffffff", fontSize: "0.8rem", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                      {optionLetter}
-                                    </span>
-                                    <span style={{ fontSize: "0.95rem", color: "#ffffff", fontWeight: isMyChoice ? 800 : 600 }}>
-                                      {opt.text}
-                                    </span>
-                                    {isMyChoice && (
-                                      <span style={{ fontSize: "0.75rem", color: "#c4b5fd", fontWeight: 800 }}>
-                                        (Your Choice)
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span style={{ fontSize: "0.9rem", fontWeight: 800, color: "#38bdf8" }}>
-                                    {pct}%
-                                  </span>
-                                </div>
-
-                                <div style={{ height: "7px", background: "rgba(255, 255, 255, 0.12)", borderRadius: "99px", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #7c3aed 0%, #38bdf8 100%)", borderRadius: "99px", transition: "width 0.5s ease-out" }} />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "18px" }}>
-                            {poll.options.map((opt, optIdx) => {
-                              const optionLetter = String.fromCharCode(65 + optIdx);
-                              const isSelected = selectedOptIdx === optIdx;
-
-                              return (
-                                <button
-                                  key={opt.id || optIdx}
-                                  type="button"
-                                  onClick={() => setSelectedOptions((prev) => ({ ...prev, [poll.id]: optIdx }))}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "12px",
-                                    padding: "14px 18px",
-                                    borderRadius: "14px",
-                                    background: isSelected ? "rgba(124, 58, 237, 0.3)" : "rgba(22, 27, 46, 0.95)",
-                                    border: isSelected ? "1.5px solid #a78bfa" : "1.5px solid rgba(148, 163, 184, 0.35)",
-                                    color: "#ffffff",
-                                    fontSize: "0.95rem",
-                                    fontWeight: isSelected ? 800 : 600,
-                                    cursor: "pointer",
-                                    textAlign: "left",
-                                    transition: "all 0.15s ease",
-                                    boxShadow: isSelected ? "0 0 16px rgba(124, 58, 237, 0.4)" : "none",
-                                  }}
-                                >
-                                  <span style={{ width: "26px", height: "26px", borderRadius: "6px", background: isSelected ? "#7c3aed" : "rgba(124, 58, 237, 0.25)", border: "1px solid rgba(167, 139, 250, 0.4)", color: isSelected ? "#ffffff" : "#c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.85rem", fontWeight: 800 }}>
-                                    {optionLetter}
-                                  </span>
-                                  <span>{opt.text}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleCastVote(poll.id)}
-                            disabled={selectedOptIdx === undefined}
-                            style={{
-                              width: "100%",
-                              padding: "14px",
-                              borderRadius: "14px",
-                              background: selectedOptIdx !== undefined ? "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)" : "rgba(15, 20, 35, 0.6)",
-                              border: "1px solid rgba(255, 255, 255, 0.1)",
-                              color: selectedOptIdx !== undefined ? "#ffffff" : "#64748b",
-                              fontSize: "0.95rem",
-                              fontWeight: 700,
-                              cursor: selectedOptIdx !== undefined ? "pointer" : "not-allowed",
-                              boxShadow: selectedOptIdx !== undefined ? "0 4px 16px rgba(124, 58, 237, 0.4)" : "none",
-                            }}
-                          >
-                            Submit Answer →
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {/* Quizzes Section */}
-                {!activeQuiz ? (
-                  quizzes.map((quiz) => (
-                    <div
-                      key={quiz.id}
-                      style={{
-                        background: "rgba(15, 20, 35, 0.95)",
-                        border: "1.5px solid rgba(234, 179, 8, 0.45)",
-                        borderRadius: "18px",
-                        padding: "22px",
-                        boxShadow: "0 8px 25px rgba(0, 0, 0, 0.4)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                        <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "#fef08a", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          Live Quiz
-                        </span>
-                        <span style={{ fontSize: "0.85rem", color: "#fef08a", fontWeight: 700 }}>
-                          🏆 {quiz.totalPoints || 20} PTS
-                        </span>
-                      </div>
-
-                      <h3 style={{ color: "#ffffff", fontSize: "1.15rem", fontWeight: 800, margin: "0 0 10px 0" }}>
-                        {quiz.title}
-                      </h3>
-                      {quiz.description && (
-                        <p style={{ color: "#cbd5e1", fontSize: "0.9rem", lineHeight: 1.5, margin: "0 0 16px" }}>
-                          {quiz.description}
-                        </p>
-                      )}
 
                       <button
                         onClick={() => {
-                          setActiveQuiz(quiz);
-                          setUserAnswers({});
-                          setQuizSubmitted(false);
-                          setQuizScore(0);
+                          setJoinedEvent(evt);
+                          setEventSubTab(polls.length > 0 ? "polls" : quizzes.length > 0 ? "quizzes" : "polls");
                         }}
-                        style={{
-                          width: "100%",
-                          padding: "14px",
-                          background: "rgba(234, 179, 8, 0.15)",
-                          border: "1px solid rgba(234, 179, 8, 0.4)",
-                          borderRadius: "12px",
-                          color: "#eab308",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                        }}
+                        className="px-6 py-3 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-sky-500/30 flex items-center gap-2 transition-all cursor-pointer"
                       >
-                        Join Quiz →
+                        <Gamepad2 size={16} />
+                        <span>Enter Event Arena</span>
+                        <ChevronRight size={14} />
                       </button>
                     </div>
-                  ))
-                ) : (
-                  /* Active Quiz Game Runner */
-                  <div style={{ background: "rgba(15, 20, 35, 0.95)", border: "1.5px solid rgba(234, 179, 8, 0.45)", borderRadius: "18px", padding: "28px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "14px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                  </Card>
+                ))
+              )}
+            </div>
+
+            {/* EVENT ARENA FULL-SCREEN GLASSMODAL */}
+            {joinedEvent && (
+              <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200">
+                <div className="w-full max-w-4xl bg-white/[0.03] border border-violet-400/25 rounded-3xl p-6 sm:p-8 text-slate-100 shadow-[0_0_80px_rgba(124,58,237,0.20)] ring-1 ring-white/[0.06] my-auto max-h-[92vh] overflow-y-auto flex flex-col relative backdrop-blur-2xl">
+                  
+                  {/* Arena Header */}
+                  <div className="flex flex-wrap items-center justify-between gap-4 pb-5 mb-6 border-b border-white/[0.08]">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600 via-indigo-600 to-sky-500 p-[1px] shadow-lg shadow-violet-600/40">
+                        <div className="w-full h-full rounded-[inherit] bg-slate-950 flex items-center justify-center text-2xl">
+                          🎮
+                        </div>
+                      </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: "1.3rem", fontWeight: 800, color: "#fff" }}>{activeQuiz.title}</h3>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <h2 className="text-2xl font-black text-white tracking-tight">{joinedEvent.title}</h2>
+                          <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold text-[11px] px-2.5 py-0.5 animate-pulse">
+                            ● ARENA LIVE
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">Glitch Fest Interactive Event Arena</p>
                       </div>
-                      <button
-                        onClick={() => setActiveQuiz(null)}
-                        style={{ background: "transparent", border: "1px solid rgba(148,163,184,0.3)", color: "#94a3b8", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontSize: "0.8rem" }}
-                      >
-                        ✕ Exit
-                      </button>
                     </div>
 
-                    {!quizSubmitted ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                        {activeQuiz.questions.map((q, qIdx) => (
-                          <div key={q.id || qIdx} style={{ background: "rgba(22, 27, 46, 0.95)", padding: "18px", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.08)" }}>
-                            <h4 style={{ margin: "0 0 12px", fontSize: "1rem", fontWeight: 700, color: "#fff" }}>
-                              {qIdx + 1}. {q.question}
-                            </h4>
-                            <div style={{ display: "grid", gap: "10px" }}>
-                              {q.options.map((opt, oIdx) => (
-                                <label
-                                  key={oIdx}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                    padding: "12px 14px",
-                                    background: userAnswers[qIdx] === oIdx ? "rgba(234, 179, 8, 0.2)" : "rgba(15, 20, 35, 0.8)",
-                                    border: userAnswers[qIdx] === oIdx ? "1px solid #eab308" : "1px solid rgba(148, 163, 184, 0.2)",
-                                    borderRadius: "10px",
-                                    cursor: "pointer",
-                                    fontSize: "0.9rem",
-                                    fontWeight: 600,
-                                    color: "#cbd5e1",
-                                  }}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={`q_${qIdx}`}
-                                    checked={userAnswers[qIdx] === oIdx}
-                                    onChange={() => setUserAnswers({ ...userAnswers, [qIdx]: oIdx })}
-                                  />
-                                  {opt}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
+                    <button
+                      onClick={() => setJoinedEvent(null)}
+                      className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.07] text-slate-400 hover:text-white font-bold text-xs transition-all cursor-pointer backdrop-blur-md"
+                    >
+                      ✕ Exit Arena
+                    </button>
+                  </div>
 
+                  {/* Arena Sub-Tabs Navigation - only visible if there is content */}
+                  {(polls.length > 0 || quizzes.length > 0) && (
+                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] mb-6 backdrop-blur-2xl">
+                      {polls.length > 0 && (
                         <button
-                          onClick={handleQuizSubmit}
-                          style={{
-                            width: "100%",
-                            padding: "14px",
-                            background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: "12px",
-                            fontWeight: 800,
-                            fontSize: "0.95rem",
-                            cursor: "pointer",
-                          }}
+                          onClick={() => setEventSubTab("polls")}
+                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            eventSubTab === "polls"
+                              ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-600/30"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                          }`}
                         >
-                          Submit Answers →
+                          <Vote size={16} />
+                          <span>Live Polls ({polls.length})</span>
                         </button>
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: "center", padding: "16px 0" }}>
-                        <div style={{ fontSize: "2.5rem", marginBottom: "8px" }}>🏆</div>
-                        <h3 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "0 0 6px", color: "#4ade80" }}>Quiz Completed!</h3>
-                        <p style={{ fontSize: "1rem", color: "#cbd5e1", margin: "0 0 20px" }}>
-                          You scored <strong style={{ color: "#fef08a", fontSize: "1.2rem" }}>{quizScore}</strong> out of {activeQuiz.totalPoints} points!
-                        </p>
+                      )}
+
+                      {quizzes.length > 0 && (
                         <button
-                          onClick={() => setActiveQuiz(null)}
-                          style={{ padding: "10px 24px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", borderRadius: "10px", fontWeight: 700, cursor: "pointer" }}
+                          onClick={() => setEventSubTab("quizzes")}
+                          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                            eventSubTab === "quizzes"
+                              ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-600/30"
+                              : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]"
+                          }`}
                         >
-                          Back to Activity Hub
+                          <Brain size={16} />
+                          <span>Trivia Quizzes ({quizzes.length})</span>
                         </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Arena Tab Content */}
+                  <div className="flex-1 overflow-y-auto pr-1">
+                    
+                    {/* Sub-Tab 1: Polls inside Arena */}
+                    {eventSubTab === "polls" && polls.length > 0 && (
+                      <div className="space-y-5">
+                        {polls.map((poll) => {
+                            const hasVoted = Boolean(userVotes[poll.id]);
+                            const userVotedOptionId = userVotes[poll.id];
+                            const selectedOptIdx = selectedOptions[poll.id];
+                            const totalVotes = poll.options
+                              ? poll.options.reduce((sum, o) => sum + (o.votes || 0), 0)
+                              : poll.totalVotes || 0;
+
+                            return (
+                              <Card key={poll.id} className="bg-white/[0.02] p-6 border-white/[0.06] shadow-[0_4px_30px_rgba(0,0,0,0.2)] backdrop-blur-2xl ring-1 ring-white/[0.04]">
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                  <span className="text-xs font-bold text-violet-400 uppercase tracking-wider">Live Audience Question</span>
+                                  {hasVoted && (
+                                    <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold text-xs flex items-center gap-1">
+                                      <CheckCircle2 size={12} /> Response Recorded
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                <h3 className="text-lg font-black text-white mb-5 leading-snug">{poll.question}</h3>
+
+                                {hasVoted ? (
+                                  <div className="space-y-3">
+                                    {poll.options.map((opt, optIdx) => {
+                                      const count = opt.votes || 0;
+                                      const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                                      const isMyChoice = userVotedOptionId === opt.id;
+                                      return (
+                                        <div key={opt.id || optIdx} className={`p-4 rounded-2xl border transition-all ${isMyChoice ? "bg-violet-950/40 border-violet-500/60 shadow-lg shadow-violet-950/40" : "bg-slate-950/60 border-slate-800/80"}`}>
+                                          <div className="flex justify-between items-center text-sm font-semibold mb-2">
+                                            <span className="text-white flex items-center gap-2">
+                                              {opt.text}
+                                              {isMyChoice && <span className="text-xs text-violet-300 font-bold">(Your Choice)</span>}
+                                            </span>
+                                            <span className="text-sky-400 font-extrabold">{pct}%</span>
+                                          </div>
+                                          <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                            <div className="h-full bg-gradient-to-r from-violet-600 via-indigo-500 to-sky-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2.5">
+                                      {poll.options.map((opt, optIdx) => {
+                                        const isSelected = selectedOptIdx === optIdx;
+                                        return (
+                                          <button
+                                            key={opt.id || optIdx}
+                                            onClick={() => setSelectedOptions((prev) => ({ ...prev, [poll.id]: optIdx }))}
+                                            className={`w-full text-left p-4 rounded-2xl border text-sm font-bold flex items-center gap-3 transition-all cursor-pointer ${
+                                              isSelected
+                                                ? "bg-violet-900/50 border-violet-500 text-white shadow-lg shadow-violet-950/50"
+                                                : "bg-slate-950/60 border-slate-800/80 text-slate-300 hover:border-slate-700"
+                                            }`}
+                                          >
+                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-black ${isSelected ? "bg-violet-500 text-white" : "bg-slate-800 text-slate-400"}`}>
+                                              {String.fromCharCode(65 + optIdx)}
+                                            </div>
+                                            <span>{opt.text}</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+
+                                    <button
+                                      onClick={() => handleCastVote(poll.id)}
+                                      disabled={selectedOptIdx === undefined}
+                                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-black text-sm shadow-lg shadow-violet-600/30 transition-all cursor-pointer disabled:opacity-40"
+                                    >
+                                      Submit Response
+                                    </button>
+                                  </div>
+                                )}
+                              </Card>
+                            );
+                          })}
                       </div>
                     )}
+
+                    {/* Sub-Tab 2: Quizzes inside Arena */}
+                    {eventSubTab === "quizzes" && quizzes.length > 0 && (
+                      <div className="space-y-4">
+                        {!activeQuiz ? (
+                          quizzes.map((quiz) => (
+                              <Card key={quiz.id} className="bg-white/[0.02] p-6 border-purple-400/25 shadow-[0_4px_30px_rgba(0,0,0,0.2)] backdrop-blur-2xl ring-1 ring-white/[0.04]">
+                                <div className="flex justify-between items-center mb-3">
+                                  <Badge className="bg-purple-500/15 text-purple-300 border-purple-500/30 font-bold text-xs">
+                                    Trivia Challenge
+                                  </Badge>
+                                  <span className="text-xs font-black text-purple-400">🏆 {quiz.totalPoints} PTS</span>
+                                </div>
+                                <h3 className="text-lg font-black text-white mb-2">{quiz.title}</h3>
+                                {quiz.description && <p className="text-slate-300 text-xs mb-5 leading-relaxed">{quiz.description}</p>}
+                                <button
+                                  onClick={() => {
+                                    setActiveQuiz(quiz);
+                                    setUserAnswers({});
+                                    setQuizSubmitted(false);
+                                    setQuizScore(0);
+                                  }}
+                                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                  <span>Start Quiz Challenge</span>
+                                  <ChevronRight size={14} />
+                                </button>
+                              </Card>
+                            ))
+                        ) : (
+                          /* QUIZ RUNNER INTERFACE */
+                          <Card className="bg-white/[0.02] border-purple-400/25 p-6 shadow-[0_0_40px_rgba(168,85,247,0.12)] backdrop-blur-2xl ring-1 ring-white/[0.04]">
+                            <div className="flex items-center justify-between pb-4 mb-5 border-b border-white/10">
+                              <div>
+                                <h3 className="text-lg font-black text-white">{activeQuiz.title}</h3>
+                                <p className="text-xs text-purple-400 font-bold">Total Points: {activeQuiz.totalPoints}</p>
+                              </div>
+                              <button
+                                onClick={() => setActiveQuiz(null)}
+                                className="px-3.5 py-1.5 rounded-xl border border-white/10 text-slate-400 hover:text-white text-xs font-bold cursor-pointer"
+                              >
+                                Back to Quizzes
+                              </button>
+                            </div>
+
+                            {!quizSubmitted ? (
+                              <div className="space-y-5">
+                                {activeQuiz.questions.map((q, qIdx) => (
+                                  <div key={q.id || qIdx} className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-md">
+                                    <h4 className="text-xs font-bold text-white mb-3 leading-relaxed">
+                                      {qIdx + 1}. {q.question}
+                                    </h4>
+                                    <div className="space-y-2">
+                                      {q.options.map((opt, oIdx) => (
+                                        <label
+                                          key={oIdx}
+                                          className={`flex items-center gap-3 p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                                            userAnswers[qIdx] === oIdx
+                                              ? "bg-purple-500/20 border-purple-400 text-white shadow-md shadow-purple-950/40"
+                                              : "bg-white/[0.02] border-white/[0.08] text-slate-300 hover:border-white/20"
+                                          }`}
+                                        >
+                                          <input
+                                            type="radio"
+                                            name={`arena_q_${qIdx}`}
+                                            checked={userAnswers[qIdx] === oIdx}
+                                            onChange={() => setUserAnswers({ ...userAnswers, [qIdx]: oIdx })}
+                                            className="accent-purple-400"
+                                          />
+                                          <span>{opt}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                <button
+                                  onClick={handleQuizSubmit}
+                                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
+                                >
+                                  Submit Quiz Answers
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="text-4xl mb-2">🏆</div>
+                                <h3 className="text-xl font-black text-purple-400 mb-1">Quiz Completed!</h3>
+                                <p className="text-slate-300 text-xs mb-5">
+                                  You scored <strong className="text-purple-300 text-base">{quizScore}</strong> out of {activeQuiz.totalPoints} points!
+                                </p>
+                                <button
+                                  onClick={() => setActiveQuiz(null)}
+                                  className="px-6 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-white font-bold text-xs cursor-pointer hover:bg-white/[0.08] transition-all"
+                                >
+                                  Back to Arena Quizzes
+                                </button>
+                              </div>
+                            )}
+                          </Card>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Empty State when both polls & quizzes are closed/paused */}
+                    {polls.length === 0 && quizzes.length === 0 && (
+                      <div className="p-12 text-center rounded-2xl bg-white/[0.02] border border-dashed border-white/10 backdrop-blur-xl">
+                        <Sparkles className="mx-auto text-violet-400 mb-3 animate-pulse" size={36} />
+                        <h4 className="text-base font-bold text-white mb-1">No Active Activities</h4>
+                        <p className="text-xs text-slate-400">All live polls and trivia quizzes have been paused or closed by admins.</p>
+                      </div>
+                    )}
+
+
+
                   </div>
-                )}
-                  </>
-                )}
+                </div>
               </div>
-            </div>
+            )}
+
           </div>
         )}
       </main>

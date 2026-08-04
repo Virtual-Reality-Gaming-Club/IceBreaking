@@ -173,6 +173,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar {
   animation: beam-rotate 4s linear infinite;
 }
 
+@keyframes liquid-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
 .animate-liquid-pulse {
   animation: liquid-pulse 3.5s ease-in-out infinite;
 }

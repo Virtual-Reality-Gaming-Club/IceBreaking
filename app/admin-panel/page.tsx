@@ -8,9 +8,11 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
 import { collection, getDocs } from "firebase/firestore";
+import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { VideoBackground } from "@/components/ui/VideoBackground";
 
 interface EventItem {
   id: string;
@@ -35,6 +37,7 @@ interface ParticipantItem {
 }
 
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { AdminConfirmModal } from "@/components/ui/admin-confirm-modal";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -54,7 +57,7 @@ export default function AdminDashboardPage() {
   const [pollsList, setPollsList] = useState<any[]>([]);
   const [quizzesList, setQuizzesList] = useState<any[]>([]);
   const [eventsList, setEventsList] = useState<EventItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools">("overview");
 
   // Global Registration Toggle State
   const [registrationOpen, setRegistrationOpen] = useState(false);
@@ -99,6 +102,21 @@ export default function AdminDashboardPage() {
   const [editParticipantReg, setEditParticipantReg] = useState("");
   const [editParticipantScore, setEditParticipantScore] = useState(0);
   const [isSavingParticipant, setIsSavingParticipant] = useState(false);
+
+  // Irreversible Action Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: React.ReactNode;
+    confirmLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmLabel: "Delete",
+    onConfirm: () => {},
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -323,15 +341,26 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeletePoll = async (pollId: string) => {
-    if (!confirm("Are you sure you want to delete this poll?")) return;
-    try {
-      const { doc, deleteDoc } = await import("firebase/firestore");
-      await deleteDoc(doc(db, "polls", pollId));
-      fetchPolls();
-    } catch (err) {
-      console.error("Error deleting poll:", err);
-    }
+  const handleDeletePoll = (poll: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete poll permanently?",
+      description: (
+        <p>
+          This will permanently delete the poll <strong>&quot;{poll.question}&quot;</strong> and all associated votes. This action cannot be undone.
+        </p>
+      ),
+      confirmLabel: "Delete Poll",
+      onConfirm: async () => {
+        try {
+          const { doc, deleteDoc } = await import("firebase/firestore");
+          await deleteDoc(doc(db, "polls", poll.id));
+          fetchPolls();
+        } catch (err) {
+          console.error("Error deleting poll:", err);
+        }
+      },
+    });
   };
 
   // QUIZ HANDLERS
@@ -440,15 +469,26 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeleteQuiz = async (quizId: string) => {
-    if (!confirm("Are you sure you want to delete this quiz?")) return;
-    try {
-      const { doc, deleteDoc } = await import("firebase/firestore");
-      await deleteDoc(doc(db, "quizzes", quizId));
-      fetchQuizzes();
-    } catch (err) {
-      console.error("Error deleting quiz:", err);
-    }
+  const handleDeleteQuiz = (quiz: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete quiz permanently?",
+      description: (
+        <p>
+          This will permanently delete <strong>&quot;{quiz.title}&quot;</strong> and all questions/responses. This action cannot be undone.
+        </p>
+      ),
+      confirmLabel: "Delete Quiz",
+      onConfirm: async () => {
+        try {
+          const { doc, deleteDoc } = await import("firebase/firestore");
+          await deleteDoc(doc(db, "quizzes", quiz.id));
+          fetchQuizzes();
+        } catch (err) {
+          console.error("Error deleting quiz:", err);
+        }
+      },
+    });
   };
 
   // PARTICIPANT HANDLERS (Firestore 'participants' collection)
@@ -531,16 +571,27 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeleteParticipant = async (participantId: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete participant entry '${name || participantId}'?`)) return;
-    try {
-      const { doc, deleteDoc } = await import("firebase/firestore");
-      await deleteDoc(doc(db, "participants", participantId));
-      fetchDashboardData();
-    } catch (err) {
-      console.error("Error deleting participant:", err);
-      alert("Failed to delete participant entry.");
-    }
+  const handleDeleteParticipant = (participantId: string, name: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete participant permanently?",
+      description: (
+        <p>
+          This will permanently delete participant entry <strong>&quot;{name || participantId}&quot;</strong> ({participantId}). This action cannot be undone.
+        </p>
+      ),
+      confirmLabel: "Delete Participant",
+      onConfirm: async () => {
+        try {
+          const { doc, deleteDoc } = await import("firebase/firestore");
+          await deleteDoc(doc(db, "participants", participantId));
+          fetchDashboardData();
+        } catch (err) {
+          console.error("Error deleting participant:", err);
+          alert("Failed to delete participant entry.");
+        }
+      },
+    });
   };
 
   // EVENT HANDLERS (Firestore 'events' collection)
@@ -620,15 +671,26 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleDeleteEvent = async (evtId: string) => {
-    if (!confirm("Are you sure you want to delete this event?")) return;
-    try {
-      const { doc, deleteDoc } = await import("firebase/firestore");
-      await deleteDoc(doc(db, "events", evtId));
-      fetchDashboardData();
-    } catch (err) {
-      console.error("Error deleting event:", err);
-    }
+  const handleDeleteEvent = (evt: any) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete event permanently?",
+      description: (
+        <p>
+          This will permanently delete event <strong>&quot;{evt.title}&quot;</strong> and all associated data. This action cannot be undone.
+        </p>
+      ),
+      confirmLabel: "Delete Event",
+      onConfirm: async () => {
+        try {
+          const { doc, deleteDoc } = await import("firebase/firestore");
+          await deleteDoc(doc(db, "events", evt.id));
+          fetchDashboardData();
+        } catch (err) {
+          console.error("Error deleting event:", err);
+        }
+      },
+    });
   };
 
 
@@ -673,25 +735,15 @@ export default function AdminDashboardPage() {
           boxShadow: "0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(124, 58, 237, 0.1)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <div
-            style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "12px",
-              background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 900,
-              fontSize: "1.2rem",
-              color: "#ffffff",
-              boxShadow: "0 0 20px rgba(124, 58, 237, 0.5)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
-            }}
-          >
-            ⚡
-          </div>
+        <Link href="/" className="flex items-center gap-3.5 hover:opacity-90 transition-opacity no-underline">
+          <Image
+            src="/logo.png"
+            alt="VRGC Logo"
+            width={55}
+            height={32}
+            style={{ objectFit: "contain" }}
+            priority
+          />
           <div>
             <div className="group relative flex items-center justify-center rounded-full px-3.5 py-1 shadow-[inset_0_-8px_10px_#8fdfff1f] transition-shadow duration-500 ease-out hover:shadow-[inset_0_-5px_10px_#8fdfff3f] border border-violet-500/30 bg-slate-950/60">
               <span
@@ -712,7 +764,7 @@ export default function AdminDashboardPage() {
               IceBreaking 2026 Dashboard
             </span>
           </div>
-        </div>
+        </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           {/* User Profile Avatar & Info */}
@@ -777,20 +829,10 @@ export default function AdminDashboardPage() {
 
       <div style={{ display: "flex", minHeight: "calc(100vh - 72px)" }}>
         {/* Sidebar Navigation */}
-        <aside
-          style={{
-            width: "250px",
-            borderRight: "1px solid rgba(124, 58, 237, 0.15)",
-            background: "rgba(10, 13, 24, 0.6)",
-            backdropFilter: "blur(16px)",
-            padding: "24px 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "8px",
-          }}
-        >
+        <aside className="w-64 border-r border-violet-500/20 bg-slate-950/40 backdrop-blur-2xl p-5 flex flex-col gap-2 shrink-0">
           {[
             { id: "overview", label: "📊 Overview" },
+            { id: "leaderboard", label: "🏆 Live Leaderboard ↗", external: true },
             { id: "events", label: "🎮 Manage Events" },
             { id: "polls", label: "📊 Manage Polls" },
             { id: "quizzes", label: "🧠 Manage Quizzes" },
@@ -802,44 +844,31 @@ export default function AdminDashboardPage() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as any)}
-                style={{
-                  width: "100%",
-                  padding: "12px 18px",
-                  borderRadius: "12px",
-                  border: isActive ? "1px solid rgba(124, 58, 237, 0.4)" : "1px solid transparent",
-                  background: isActive
-                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(59, 130, 246, 0.15) 100%)"
-                    : "transparent",
-                  color: isActive ? "#ffffff" : "#94a3b8",
-                  fontWeight: isActive ? 800 : 600,
-                  fontSize: "0.92rem",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  transition: "all 0.25s ease",
-                  boxShadow: isActive ? "0 4px 20px rgba(124, 58, 237, 0.25)" : "none",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = "rgba(124, 58, 237, 0.12)";
-                    e.currentTarget.style.color = "#c4b5fd";
+                onClick={() => {
+                  if (item.external) {
+                    window.open("/leaderboard", "_blank");
+                  } else {
+                    setActiveTab(item.id as any);
                   }
                 }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#94a3b8";
-                  }
-                }}
+                className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                  isActive
+                    ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white shadow-[0_0_20px_rgba(124,58,237,0.25)]"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
+                }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />}
               </button>
             );
           })}
 
-          <div style={{ marginTop: "auto", paddingTop: "20px", borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
-            <Link href="/" style={{ color: "#a78bfa", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              ← Return to Main Site
+          <div className="mt-auto pt-4 border-t border-white/[0.08]">
+            <Link
+              href="/"
+              className="text-violet-400 hover:text-violet-300 text-xs font-bold flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.04] transition-all"
+            >
+              <span>← Return to Main Site</span>
             </Link>
           </div>
         </aside>
@@ -885,13 +914,13 @@ export default function AdminDashboardPage() {
               {/* Metrics Grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "22px", marginBottom: "40px" }}>
                 {[
-                  { label: "Total Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30" },
-                  { label: "Active Events", value: eventsList.length, color: "#60a5fa", accent: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
-                  { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
-                  { label: "Active Quizzes", value: quizzesList.length, color: "#f472b6", accent: "bg-pink-500/10 text-pink-400 border-pink-500/30" },
-                  { label: "System Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+                  { label: "Total Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
+                  { label: "Active Events", value: eventsList.length, color: "#38bdf8", accent: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
+                  { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+                  { label: "Active Quizzes", value: quizzesList.length, color: "#c084fc", accent: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+                  { label: "System Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
                 ].map((card, idx) => (
-                  <Card key={idx} className="bg-slate-950/80 border-slate-800 shadow-xl backdrop-blur-xl relative overflow-hidden transition-all hover:border-violet-500/40">
+                  <Card key={idx} className="bg-white/[0.02] border-white/[0.08] shadow-[0_0_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl relative overflow-hidden transition-all duration-300 hover:border-violet-400/50 hover:shadow-[0_0_25px_rgba(139,92,246,0.15)] ring-1 ring-white/[0.04]">
                     <CardHeader className="pb-2">
                       <CardDescription className="text-slate-400 font-bold text-xs uppercase tracking-wider">{card.label}</CardDescription>
                       <CardTitle className="text-3xl font-black text-white" style={{ color: card.color }}>
@@ -908,8 +937,8 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Registered System Admins Box */}
-              <Card className="bg-slate-950/90 border-slate-800 shadow-2xl p-6 backdrop-blur-xl">
-                <CardHeader className="px-0 pt-0 pb-6 border-b border-slate-800/80 flex flex-row items-center justify-between">
+              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl p-6 backdrop-blur-2xl ring-1 ring-white/[0.04]">
+                <CardHeader className="px-0 pt-0 pb-6 border-b border-white/[0.08] flex flex-row items-center justify-between">
                   <div>
                     <CardTitle className="text-xl font-black text-white">Registered Superadmins</CardTitle>
                     <CardDescription className="text-slate-400 mt-1 text-sm">Verified administrator roster with full system privileges.</CardDescription>
@@ -927,7 +956,7 @@ export default function AdminDashboardPage() {
                     ].map((admin, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-violet-500/40 transition-all shadow-lg"
+                        className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all shadow-lg backdrop-blur-md"
                       >
                         <div className="flex items-center gap-4">
                           <Avatar size="lg">
@@ -948,6 +977,131 @@ export default function AdminDashboardPage() {
                     ))}
                   </div>
                 </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* LEADERBOARD TAB */}
+          {activeTab === "leaderboard" && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center flex-wrap gap-4 pb-2">
+                <div>
+                  <h1 className="text-2xl font-black text-white tracking-tight m-0">Live Leaderboard</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">Realtime participant score rankings & standings</p>
+                </div>
+                <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/40 font-extrabold text-xs px-4 py-1.5 shadow-md backdrop-blur-md">
+                  🏆 Total Ranked: {[...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)).length} Participants
+                </Badge>
+              </div>
+
+              {/* Top 3 Podium Feature Cards */}
+              {(() => {
+                const sorted = [...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+                const top1 = sorted[0];
+                const top2 = sorted[1];
+                const top3 = sorted[2];
+                if (!top1) return null;
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {/* Rank 2 - Silver */}
+                    {top2 ? (
+                      <div className="bg-white/[0.03] border border-slate-300/30 rounded-3xl p-6 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden order-2 md:order-1 ring-1 ring-white/[0.05]">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-200 via-slate-300 to-slate-500 text-slate-950 font-black flex items-center justify-center text-base shadow-lg shadow-slate-400/20 mb-3">
+                          🥈 #2
+                        </div>
+                        <h4 className="text-base font-black text-white mb-0.5 tracking-tight">{top2.fullName || top2.name}</h4>
+                        <span className="text-xs font-mono text-slate-400 font-bold mb-3">{top2.registrationNumber || top2.id}</span>
+                        <Badge className="bg-slate-300/20 text-slate-200 border-slate-300/40 font-black text-xs px-4 py-1">
+                          {top2.totalScore || 0} PTS
+                        </Badge>
+                      </div>
+                    ) : <div />}
+
+                    {/* Rank 1 - Gold */}
+                    <div className="bg-amber-500/10 border border-amber-400/50 rounded-3xl p-7 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(245,158,11,0.2)] relative overflow-hidden order-1 md:order-2 ring-1 ring-amber-400/40 -translate-y-1">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black flex items-center justify-center text-xl shadow-xl shadow-amber-500/40 mb-3">
+                        👑 #1
+                      </div>
+                      <h4 className="text-lg font-black text-amber-200 mb-0.5 tracking-tight">{top1.fullName || top1.name}</h4>
+                      <span className="text-xs font-mono text-amber-400/80 font-bold mb-3">{top1.registrationNumber || top1.id}</span>
+                      <Badge className="bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 border-amber-300 font-black text-xs px-4 py-1.5 shadow-lg shadow-amber-400/20">
+                        {top1.totalScore || 0} PTS
+                      </Badge>
+                    </div>
+
+                    {/* Rank 3 - Bronze */}
+                    {top3 ? (
+                      <div className="bg-white/[0.03] border border-amber-700/40 rounded-3xl p-6 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden order-3 ring-1 ring-white/[0.05]">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 text-amber-100 font-black flex items-center justify-center text-base shadow-lg shadow-amber-900/30 mb-3">
+                          🥉 #3
+                        </div>
+                        <h4 className="text-base font-black text-white mb-0.5 tracking-tight">{top3.fullName || top3.name}</h4>
+                        <span className="text-xs font-mono text-amber-600/80 font-bold mb-3">{top3.registrationNumber || top3.id}</span>
+                        <Badge className="bg-amber-700/20 text-amber-300 border-amber-700/40 font-black text-xs px-4 py-1">
+                          {top3.totalScore || 0} PTS
+                        </Badge>
+                      </div>
+                    ) : <div />}
+                  </div>
+                );
+              })()}
+
+              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl backdrop-blur-2xl p-6 ring-1 ring-white/[0.04] rounded-3xl">
+                {[...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)).length > 0 ? (
+                  <div className="space-y-3">
+                    {[...participantsList]
+                      .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
+                      .map((p, idx) => {
+                        const rank = idx + 1;
+                        const pName = p.fullName || p.name || "Participant";
+                        const pReg = p.registrationNumber || p.id;
+                        const score = p.totalScore || 0;
+
+                        return (
+                          <div
+                            key={p.id}
+                            className={`flex items-center justify-between p-4 rounded-2xl border transition-all shadow-md flex-wrap gap-3 backdrop-blur-md ${
+                              rank === 1
+                                ? "bg-amber-500/10 border-amber-400/40 shadow-[0_0_20px_rgba(245,158,11,0.15)]"
+                                : rank === 2
+                                ? "bg-white/[0.04] border-slate-300/30"
+                                : rank === 3
+                                ? "bg-white/[0.03] border-amber-700/30"
+                                : "bg-white/[0.02] border-white/[0.06] hover:border-violet-400/40"
+                            }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
+                                  rank === 1
+                                    ? "bg-gradient-to-br from-amber-300 to-amber-500 text-slate-950 shadow-md shadow-amber-400/30 ring-2 ring-amber-400/40"
+                                    : rank === 2
+                                    ? "bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950 shadow-md"
+                                    : rank === 3
+                                    ? "bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-md"
+                                    : "bg-white/[0.06] text-violet-300 border border-white/10"
+                                }`}
+                              >
+                                #{rank}
+                              </div>
+                              <div>
+                                <h4 className="text-base font-black text-white m-0 leading-snug">{pName}</h4>
+                                <span className="text-xs font-mono text-violet-400 font-bold block mt-0.5">{pReg}</span>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-xl font-black text-sky-400 block leading-none drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]">{score}</span>
+                              <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">PTS</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-center py-8">No participant scores found.</p>
+                )}
               </Card>
             </div>
           )}
@@ -1004,7 +1158,7 @@ export default function AdminDashboardPage() {
                             ✏️ Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteEvent(evt.id)}
+                            onClick={() => handleDeleteEvent(evt)}
                             className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
@@ -1080,7 +1234,7 @@ export default function AdminDashboardPage() {
                               ✏️ Edit
                             </button>
                             <button
-                              onClick={() => handleDeletePoll(poll.id)}
+                              onClick={() => handleDeletePoll(poll)}
                               className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                             >
                               🗑️ Delete
@@ -1179,7 +1333,7 @@ export default function AdminDashboardPage() {
                             ✏️ Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteQuiz(quiz.id)}
+                            onClick={() => handleDeleteQuiz(quiz)}
                             className="px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
                           >
                             🗑️ Delete
@@ -1247,61 +1401,48 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
 
-              <div style={{ background: "rgba(17, 20, 32, 0.7)", border: "1px solid rgba(148, 163, 184, 0.12)", borderRadius: "16px", padding: "20px" }}>
+              <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-6 backdrop-blur-2xl shadow-xl">
                 {participantsList.length > 0 ? (
-                  participantsList.map((u) => {
-                    const pName = u.fullName || u.name || "Participant";
-                    const pReg = u.registrationNumber || u.id;
-                    return (
-                      <div key={u.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", borderBottom: "1px solid rgba(148, 163, 184, 0.1)", flexWrap: "wrap", gap: "12px" }}>
-                        <div>
-                          <h4 style={{ margin: "0 0 4px", fontSize: "1rem", fontWeight: 700, color: "#f8fafc" }}>
-                            {pName}
-                          </h4>
-                          <span style={{ fontSize: "0.82rem", color: "#a78bfa", fontWeight: 600 }}>
-                            Reg #: {pReg}
-                          </span>
+                  <div className="space-y-3">
+                    {participantsList.map((u) => {
+                      const pName = u.fullName || u.name || "Participant";
+                      const pReg = u.registrationNumber || u.id;
+                      return (
+                        <div
+                          key={u.id}
+                          className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all flex-wrap gap-3"
+                        >
+                          <div>
+                            <h4 className="text-base font-bold text-white m-0 leading-snug">
+                              {pName}
+                            </h4>
+                            <span className="text-xs font-mono text-violet-400 font-semibold block mt-0.5">
+                              Reg #: {pReg}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/30 font-extrabold text-xs px-3 py-1">
+                              ⭐ {u.totalScore || 0} PTS
+                            </Badge>
+                            <button
+                              onClick={() => handleOpenParticipantModal(u)}
+                              className="px-3.5 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30 font-bold text-xs transition-all cursor-pointer"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteParticipant(u.id, pName)}
+                              className="px-3.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 font-bold text-xs transition-all cursor-pointer"
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                          <span style={{ fontSize: "0.85rem", background: "rgba(124, 58, 237, 0.2)", color: "#c4b5fd", padding: "4px 10px", borderRadius: "6px", fontWeight: 700 }}>
-                            ⭐ Score: {u.totalScore || 0} pts
-                          </span>
-                          <button
-                            onClick={() => handleOpenParticipantModal(u)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(59, 130, 246, 0.2)",
-                              border: "1px solid rgba(59, 130, 246, 0.4)",
-                              color: "#60a5fa",
-                              borderRadius: "6px",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteParticipant(u.id, pName)}
-                            style={{
-                              padding: "6px 12px",
-                              background: "rgba(239, 68, 68, 0.15)",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                              color: "#fca5a5",
-                              borderRadius: "6px",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 ) : (
-                  <p style={{ color: "#94a3b8" }}>No registered participants found in Firestore collection 'participants'.</p>
+                  <p className="text-slate-400 text-center py-6">No registered participants found in Firestore collection &apos;participants&apos;.</p>
                 )}
               </div>
             </div>
@@ -2234,6 +2375,16 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* HEROUI ALERT DIALOG FOR IRREVERSIBLE ADMIN ACTIONS */}
+      <AdminConfirmModal
+        isOpen={confirmModal.isOpen}
+        onOpenChange={(open) => setConfirmModal((prev) => ({ ...prev, isOpen: open }))}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        confirmLabel={confirmModal.confirmLabel}
+        onConfirm={confirmModal.onConfirm}
+      />
     </div>
   );
 }

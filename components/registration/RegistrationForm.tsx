@@ -98,11 +98,16 @@ export function RegistrationForm() {
         }
       }
 
-      // Save to local storage for quick retrieval
+      // Save to local storage for quick retrieval and user session persistence
       if (typeof window !== "undefined") {
         localStorage.setItem("ib_reg_number", normalizedReg);
         localStorage.setItem("ib_full_name", normalizedName);
       }
+
+      // Automatically redirect to User Event Panel (/event) after short delay
+      setTimeout(() => {
+        router.push("/event");
+      }, 1400);
     } catch (err: any) {
       console.error("Firestore Registration Error:", err);
       setError(err.message || "Failed to register. Please check your network connection and try again.");

@@ -91,6 +91,7 @@ export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
                 About
               </Link>
 
+
               {/* Event Hub Link */}
               <Link
                 href="/event"
@@ -196,6 +197,7 @@ export function PublicNavbar({ muted, onToggleMute }: PublicNavbarProps) {
             <Info size={18} />
             About
           </Link>
+
 
         </div>
       )}
