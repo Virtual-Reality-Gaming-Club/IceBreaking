@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { normalizeName, normalizeRegNumber, isValidName, isValidRegNumber } from "@/utils/validation";
 import { Button, Input } from "@/components/ui/forms";
+import { Confetti, type ConfettiRef } from "@/components/ui/confetti";
 
 export function RegistrationForm() {
   const router = useRouter();
+  const confettiRef = useRef<ConfettiRef>(null);
   const [fullName, setFullName] = useState("");
   const [regNumber, setRegNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,6 +18,19 @@ export function RegistrationForm() {
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [regError, setRegError] = useState<string | undefined>(undefined);
   const [registeredUser, setRegisteredUser] = useState<{ fullName: string; registrationNumber: string; isExisting?: boolean } | null>(null);
+
+  // Trigger confetti when registered for the first time
+  useEffect(() => {
+    if (registeredUser && !registeredUser.isExisting) {
+      import("canvas-confetti").then((confettiModule) => {
+        const fire = confettiModule.default;
+        fire({ particleCount: 80, spread: 60, origin: { y: 0.6 }, zIndex: 99999 });
+        setTimeout(() => {
+          fire({ particleCount: 120, spread: 100, origin: { y: 0.5 }, zIndex: 99999 });
+        }, 250);
+      }).catch(err => console.error("Confetti import error:", err));
+    }
+  }, [registeredUser]);
 
   const regExample = "25BCY10001";
 
@@ -68,6 +83,19 @@ export function RegistrationForm() {
           registrationNumber: normalizedReg,
           isExisting: false,
         });
+
+        // Fire full screen confetti burst immediately on new registration
+        try {
+          const confettiModule = await import("canvas-confetti");
+          confettiModule.default({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.6 },
+            zIndex: 99999,
+          });
+        } catch (confettiErr) {
+          console.error("Confetti launch error:", confettiErr);
+        }
       }
 
       // Save to local storage for quick retrieval
@@ -102,8 +130,15 @@ export function RegistrationForm() {
           alignItems: "center",
           gap: "24px",
           boxShadow: "0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(124, 58, 237, 0.2)",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
+        <Confetti
+          ref={confettiRef}
+          className="absolute inset-0 z-0 pointer-events-none size-full"
+          manualstart={true}
+        />
         <div
           style={{
             width: "68px",

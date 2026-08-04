@@ -128,3 +128,59 @@
     @apply font-sans;
   }
 }
+
+/* Hide browser default scrollbars globally */
+html, body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Liquid Wave & Ripple Animations */
+@keyframes liquid-wave {
+  0% {
+    transform: translateX(-50%) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(0%) translateY(-2px) rotate(180deg);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0) rotate(360deg);
+  }
+}
+
+@keyframes liquid-shimmer {
+  0% {
+    transform: translateY(-200%);
+  }
+  100% {
+    transform: translateY(200%);
+  }
+}
+
+@keyframes beam-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-beam-rotate {
+  animation: beam-rotate 4s linear infinite;
+}
+
+.animate-liquid-pulse {
+  animation: liquid-pulse 3.5s ease-in-out infinite;
+}
+
+.animate-liquid-wave-2 {
+  animation: liquid-wave 4.5s infinite linear reverse;
+}
+
+.animate-liquid-shine {
+  animation: liquid-shimmer 2.5s infinite linear;
+}

@@ -26,15 +26,15 @@ export default function RegisterPage() {
   }, []);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div style={{ height: "100dvh", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
       <PublicNavbar />
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 20px", width: "100%", maxWidth: "896px", margin: "80px auto 80px" }}>
-        <div className="animate-fade-in-up" style={{ textAlign: "center", marginBottom: "48px" }}>
-          <h1 style={{ fontSize: "clamp(2.25rem, 5vw, 3rem)", fontWeight: 800, color: "white", margin: "0 0 16px 0" }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 20px", width: "100%", maxWidth: "896px", margin: "0 auto", position: "relative", zIndex: 10 }}>
+        <div className="animate-fade-in-up" style={{ textAlign: "center", marginBottom: "20px" }}>
+          <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 2.5rem)", fontWeight: 800, color: "white", margin: "0 0 8px 0" }}>
             Event <span className="text-gradient-primary">Registration</span>
           </h1>
-          <p style={{ color: "#f1f5f9", fontSize: "1.125rem", maxWidth: "672px", margin: "0 auto", lineHeight: 1.6, fontWeight: 500 }}>
+          <p style={{ color: "#f1f5f9", fontSize: "1rem", maxWidth: "600px", margin: "0 auto", lineHeight: 1.5, fontWeight: 500 }}>
             Secure your spot for IceBreaking 2026.
           </p>
         </div>

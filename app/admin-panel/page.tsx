@@ -8,6 +8,9 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
 import { collection, getDocs } from "firebase/firestore";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface EventItem {
   id: string;
@@ -649,96 +652,77 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#06070a", color: "#f8fafc", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at 20% -10%, rgba(124, 58, 237, 0.15), transparent 60%), radial-gradient(ellipse at 80% 110%, rgba(59, 130, 246, 0.1), transparent 60%), #06070a", color: "#f8fafc", fontFamily: "system-ui, sans-serif" }}>
       {/* Top Navbar */}
       <header
         style={{
-          height: "70px",
-          borderBottom: "1px solid rgba(124, 58, 237, 0.2)",
-          background: "rgba(10, 13, 24, 0.8)",
-          backdropFilter: "blur(12px)",
-          padding: "0 32px",
+          height: "72px",
+          borderBottom: "1px solid rgba(124, 58, 237, 0.25)",
+          background: "rgba(10, 13, 24, 0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          padding: "0 36px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
           top: 0,
           zIndex: 50,
+          boxShadow: "0 4px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(124, 58, 237, 0.1)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
           <div
             style={{
-              width: "38px",
-              height: "38px",
-              borderRadius: "10px",
-              background: "linear-gradient(135deg, #7c3aed, #4c1d95)",
+              width: "42px",
+              height: "42px",
+              borderRadius: "12px",
+              background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: 800,
-              fontSize: "1.1rem",
-              boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
+              fontWeight: 900,
+              fontSize: "1.2rem",
+              color: "#ffffff",
+              boxShadow: "0 0 20px rgba(124, 58, 237, 0.5)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
             }}
           >
-            V
+            ⚡
           </div>
           <div>
-            <h2 style={{ fontSize: "1.1rem", fontWeight: 800, margin: 0, letterSpacing: "-0.01em" }}>
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 900, margin: 0, letterSpacing: "-0.01em", background: "linear-gradient(90deg, #ffffff, #c4b5fd)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
               VRGC Admin Portal
             </h2>
-            <span style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 600 }}>
-              IceBreaking Gaming Fest
+            <span style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+              IceBreaking 2026 Dashboard
             </span>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           {/* User Profile Avatar & Info */}
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {user?.photoURL ? (
-              <img
-                src={user.photoURL}
-                alt={user.displayName || "Admin Avatar"}
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  border: "2px solid rgba(124, 58, 237, 0.5)",
-                  objectFit: "cover",
-                  boxShadow: "0 0 10px rgba(124, 58, 237, 0.3)",
-                }}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "rgba(15, 20, 35, 0.6)", padding: "6px 14px 6px 8px", borderRadius: "30px", border: "1px solid rgba(124, 58, 237, 0.25)" }}>
+            <Avatar>
+              <AvatarImage
+                src={user?.photoURL || undefined}
+                alt={user?.displayName || "Admin Avatar"}
               />
-            ) : (
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg, #7c3aed, #4c1d95)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 700,
-                  fontSize: "1.1rem",
-                  color: "#ffffff",
-                  border: "2px solid rgba(124, 58, 237, 0.5)",
-                }}
-              >
+              <AvatarFallback className="bg-violet-900 text-violet-200 font-bold">
                 {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
-              </div>
-            )}
+              </AvatarFallback>
+            </Avatar>
 
             <div style={{ textAlign: "left" }}>
-              <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#f8fafc", lineHeight: 1.2 }}>
+              <p style={{ margin: 0, fontSize: "0.9rem", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2 }}>
                 {user?.displayName
                   ? user.displayName.replace(/\b[0-9]{2}[A-Za-z]{3}[0-9]{5}\b/gi, "").trim()
                   : "Admin User"}
               </p>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
-                <span style={{ fontSize: "0.72rem", background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", border: "1px solid rgba(34, 197, 94, 0.3)", padding: "1px 8px", borderRadius: "4px", fontWeight: 700 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold">
                   👑 Superadmin
-                </span>
+                </Badge>
               </div>
             </div>
           </div>
@@ -749,16 +733,27 @@ export default function AdminDashboardPage() {
               router.push("/admin-panel/login");
             }}
             style={{
-              padding: "8px 16px",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              background: "rgba(239, 68, 68, 0.15)",
+              padding: "9px 18px",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              background: "rgba(239, 68, 68, 0.12)",
               color: "#fca5a5",
               border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "8px",
+              borderRadius: "12px",
               cursor: "pointer",
-              transition: "all 0.2s",
-              marginLeft: "8px",
+              transition: "all 0.25s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.25)";
+              e.currentTarget.style.color = "#ffffff";
+              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
+              e.currentTarget.style.boxShadow = "0 0 15px rgba(239, 68, 68, 0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)";
+              e.currentTarget.style.color = "#fca5a5";
+              e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
             🚪 Sign Out
@@ -766,13 +761,14 @@ export default function AdminDashboardPage() {
         </div>
       </header>
 
-      <div style={{ display: "flex", minHeight: "calc(100vh - 70px)" }}>
-        {/* Sidebar */}
+      <div style={{ display: "flex", minHeight: "calc(100vh - 72px)" }}>
+        {/* Sidebar Navigation */}
         <aside
           style={{
-            width: "240px",
-            borderRight: "1px solid rgba(148, 163, 184, 0.1)",
-            background: "rgba(10, 13, 24, 0.5)",
+            width: "250px",
+            borderRight: "1px solid rgba(124, 58, 237, 0.15)",
+            background: "rgba(10, 13, 24, 0.6)",
+            backdropFilter: "blur(16px)",
             padding: "24px 16px",
             display: "flex",
             flexDirection: "column",
@@ -787,43 +783,61 @@ export default function AdminDashboardPage() {
             { id: "users", label: "👥 Participants" },
             { id: "admins", label: "🛡️ Admin Roster" },
             { id: "tools", label: "⚙️ Database Tools" },
-          ].map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id as any)}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTab === item.id ? "rgba(124, 58, 237, 0.25)" : "transparent",
-                color: activeTab === item.id ? "#c4b5fd" : "#94a3b8",
-                fontWeight: activeTab === item.id ? 700 : 500,
-                fontSize: "0.9rem",
-                textAlign: "left",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+          ].map((item) => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as any)}
+                style={{
+                  width: "100%",
+                  padding: "12px 18px",
+                  borderRadius: "12px",
+                  border: isActive ? "1px solid rgba(124, 58, 237, 0.4)" : "1px solid transparent",
+                  background: isActive
+                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(59, 130, 246, 0.15) 100%)"
+                    : "transparent",
+                  color: isActive ? "#ffffff" : "#94a3b8",
+                  fontWeight: isActive ? 800 : 600,
+                  fontSize: "0.92rem",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  transition: "all 0.25s ease",
+                  boxShadow: isActive ? "0 4px 20px rgba(124, 58, 237, 0.25)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "rgba(124, 58, 237, 0.12)";
+                    e.currentTarget.style.color = "#c4b5fd";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "#94a3b8";
+                  }
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
 
           <div style={{ marginTop: "auto", paddingTop: "20px", borderTop: "1px solid rgba(148, 163, 184, 0.1)" }}>
-            <Link href="/" style={{ color: "#a78bfa", fontSize: "0.85rem", textDecoration: "none" }}>
+            <Link href="/" style={{ color: "#a78bfa", fontSize: "0.85rem", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
               ← Return to Main Site
             </Link>
           </div>
         </aside>
 
         {/* Main Content Area */}
-        <main style={{ flex: 1, padding: "32px 40px", maxWidth: "1200px" }}>
+        <main style={{ flex: 1, padding: "36px 44px", maxWidth: "1250px" }}>
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div>
-              <h1 style={{ fontSize: "1.8rem", fontWeight: 800, marginBottom: "8px" }}>Dashboard Overview</h1>
-              <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>
-                Real-time operational summary of the IceBreaking event platform.
+              <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.02em" }}>Dashboard Overview</h1>
+              <p style={{ color: "#94a3b8", fontSize: "0.98rem", marginBottom: "36px" }}>
+                Real-time operational metrics & platform controls for IceBreaking 2026.
               </p>
 
               {/* Event Registration Status Control Banner */}
@@ -886,51 +900,72 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* Metrics Grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "40px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "22px", marginBottom: "40px" }}>
                 {[
-                  { label: "Total Participants", value: stats.totalUsers || 2, change: "+100%", color: "#818cf8" },
-                  { label: "Active Events", value: eventsList.length, change: "Live", color: "#60a5fa" },
-                  { label: "Active Polls", value: pollsList.length, change: "Live", color: "#f59e0b" },
-                  { label: "Active Quizzes", value: quizzesList.length, change: "Live", color: "#ec4899" },
-                  { label: "System Admins", value: stats.activeAdmins || 2, change: "Active", color: "#f472b6" },
+                  { label: "Total Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30" },
+                  { label: "Active Events", value: eventsList.length, color: "#60a5fa", accent: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
+                  { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+                  { label: "Active Quizzes", value: quizzesList.length, color: "#f472b6", accent: "bg-pink-500/10 text-pink-400 border-pink-500/30" },
+                  { label: "System Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
                 ].map((card, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: "rgba(17, 20, 32, 0.7)",
-                      border: "1px solid rgba(148, 163, 184, 0.12)",
-                      borderRadius: "16px",
-                      padding: "24px",
-                    }}
-                  >
-                    <span style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: 600 }}>{card.label}</span>
-                    <div style={{ fontSize: "2.2rem", fontWeight: 900, color: card.color, margin: "8px 0 4px" }}>
-                      {card.value}
-                    </div>
-                    <span style={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>Status: {card.change}</span>
-                  </div>
+                  <Card key={idx} className="bg-slate-950/80 border-slate-800 shadow-xl backdrop-blur-xl relative overflow-hidden transition-all hover:border-violet-500/40">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 font-bold text-xs uppercase tracking-wider">{card.label}</CardDescription>
+                      <CardTitle className="text-3xl font-black text-white" style={{ color: card.color }}>
+                        {card.value}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0 pb-4">
+                      <Badge variant="outline" className={`${card.accent} font-bold text-[11px] px-2.5 py-0.5`}>
+                        Live System Data
+                      </Badge>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
 
+              {/* Registered System Admins Box */}
+              <Card className="bg-slate-950/90 border-slate-800 shadow-2xl p-6 backdrop-blur-xl">
+                <CardHeader className="px-0 pt-0 pb-6 border-b border-slate-800/80 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-black text-white">Registered Superadmins</CardTitle>
+                    <CardDescription className="text-slate-400 mt-1 text-sm">Verified administrator roster with full system privileges.</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-violet-500/15 text-violet-300 border-violet-500/40 px-3.5 py-1 font-bold text-xs">
+                    🛡️ 2 Active Admins
+                  </Badge>
+                </CardHeader>
 
-              {/* Recent Activity Table */}
-              <div style={{ background: "rgba(17, 20, 32, 0.7)", border: "1px solid rgba(148, 163, 184, 0.12)", borderRadius: "16px", padding: "28px" }}>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "20px" }}>Registered Admins & Access</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "rgba(124, 58, 237, 0.1)", borderRadius: "10px", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
-                    <div>
-                      <strong>Jaiyansh</strong>
-                    </div>
-                    <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
+                <CardContent className="px-0 pt-6">
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+                    {[
+                      { name: "Jaiyansh", email: "jaiyansh.25bcy10268@vitbhopal.ac.in", role: "Superadmin", initial: "J", bg: "from-violet-600 to-indigo-900" },
+                      { name: "Abhinav Mishra", email: "abhinav.25bcy10254@vitbhopal.ac.in", role: "Superadmin", initial: "A", bg: "from-blue-600 to-indigo-900" },
+                    ].map((admin, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-5 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-violet-500/40 transition-all shadow-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <Avatar size="lg">
+                            <AvatarFallback className={`bg-gradient-to-br ${admin.bg} text-white font-black text-lg border border-white/20`}>
+                              {admin.initial}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <strong className="text-base font-black text-white block">{admin.name}</strong>
+                            <span className="text-xs text-slate-400 font-semibold block mt-0.5">{admin.email}</span>
+                          </div>
+                        </div>
+
+                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold px-3 py-1 text-xs">
+                          👑 {admin.role}
+                        </Badge>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "rgba(124, 58, 237, 0.1)", borderRadius: "10px", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
-                    <div>
-                      <strong>Abhinav</strong>
-                    </div>
-                    <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 

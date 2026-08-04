@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit, Geist } from "next/font/google";
 import { AudioProvider } from "@/contexts/AudioContext";
+import { FuturisticScrollbar } from "@/components/ui/FuturisticScrollbar";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
       <body className="antialiased">
         <AudioProvider>
           {children}
+          <FuturisticScrollbar />
         </AudioProvider>
       </body>
     </html>
