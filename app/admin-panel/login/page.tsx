@@ -21,28 +21,8 @@ export default function AdminLoginPage() {
 
   // Handle redirect result if user comes back from Google Auth redirect
   useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          const currentUser = result.user;
-          setUser(currentUser);
-          const adminStatus = await checkIsAdmin(currentUser.email, currentUser.uid);
-          setIsAdmin(adminStatus);
-          if (adminStatus) {
-            // Successful admin login - redirect to Admin Dashboard Landing Page
-            console.log("Admin access granted for:", currentUser.email);
-            router.push("/admin-panel");
-          } else {
-            setError(`Access Denied: ${currentUser.email} is not listed as an administrator.`);
-          }
-        }
-      } catch (err: any) {
-        console.error("Redirect Auth Error:", err);
-      }
-    };
-    handleRedirect();
-  }, []);
+    router.replace("/admin-panel");
+  }, [router]);
 
   const signInWithGoogle = async () => {
     setIsLoading(true);

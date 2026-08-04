@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
+import { db } from "@/lib/firebase";
+import { getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 
@@ -27,8 +26,6 @@ interface ParticipantItem {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Dashboard Stats & Data
@@ -44,31 +41,9 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "events" | "users" | "admins" | "tools">("overview");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        setIsAdmin(false);
-        setLoading(false);
-        router.push("/admin-panel/login");
-        return;
-      }
-
-      setUser(currentUser);
-      const authorized = await checkIsAdmin(currentUser.email, currentUser.uid);
-      setIsAdmin(authorized);
-
-      if (!authorized) {
-        setLoading(false);
-        router.push("/admin-panel/login");
-        return;
-      }
-
-      // Load Dashboard Data
-      fetchDashboardData();
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [router]);
+    fetchDashboardData();
+    setLoading(false);
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -106,12 +81,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut(auth);
-    router.push("/admin-panel/login");
-  };
-
-  if (loading || isAdmin === null) {
+  if (loading) {
     return (
       <div
         style={{
@@ -128,10 +98,6 @@ export default function AdminDashboardPage() {
         ⚡ Loading VRGC Admin Dashboard...
       </div>
     );
-  }
-
-  if (!isAdmin) {
-    return null; // Will redirect in useEffect
   }
 
   return (
@@ -181,25 +147,9 @@ export default function AdminDashboardPage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
           <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#f1f5f9" }}>{user?.email}</p>
-            <span style={{ fontSize: "0.72rem", color: "#22c55e", fontWeight: 700 }}>● Authorized Superadmin</span>
+            <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#f1f5f9" }}>Administrator Access</p>
+            <span style={{ fontSize: "0.72rem", color: "#22c55e", fontWeight: 700 }}>● Open Access (No Auth)</span>
           </div>
-          <button
-            onClick={handleSignOut}
-            style={{
-              padding: "8px 16px",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              background: "rgba(239, 68, 68, 0.15)",
-              color: "#fca5a5",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "8px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
-          >
-            Sign Out
-          </button>
         </div>
       </header>
 
