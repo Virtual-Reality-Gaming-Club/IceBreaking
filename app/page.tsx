@@ -8,14 +8,9 @@ import Link from "next/link";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { AuroraText } from "@/components/ui/aurora-text";
-import { VideoBackground } from "@/components/ui/VideoBackground";
-import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
-import { Gamepad2, Award, Vote, Brain, Sparkles, ChevronRight, Zap } from "lucide-react";
-import { Button } from "@heroui/react";
+import { Gamepad2, ChevronRight, Zap } from "lucide-react";
 
 export default function HomePage() {
   const [regNumber, setRegNumber] = useState<string | null>(null);
@@ -42,14 +37,11 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#05070e] text-slate-100 overflow-x-hidden">
-      {/* Immersive Video Background with Audio Toggle in Navbar */}
-      <VideoBackground />
-
       <PublicNavbar />
 
       {/* Main Container */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 pt-28 pb-16 max-w-6xl mx-auto w-full">
-        
+
         {/* HERO SECTION */}
         <section className="text-center max-w-3xl mx-auto mb-16 pt-8">
           <p className="text-sm font-bold uppercase tracking-widest text-violet-400 mb-6">
@@ -67,18 +59,18 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-center gap-4">
             {regNumber ? (
               <Link href="/event">
-                <button className="group relative px-7 py-3 rounded-2xl bg-white/5 border border-violet-400/50 font-bold text-base backdrop-blur-xl hover:bg-violet-500/15 hover:border-violet-400 transition-all duration-300 flex items-center gap-2.5 cursor-pointer shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:shadow-[0_0_32px_rgba(139,92,246,0.65)]">
+                <button className="group relative px-7 py-3 rounded-2xl bg-white/5 border border-violet-400/50 font-bold text-base backdrop-blur-xl hover:bg-violet-500/15 hover:border-violet-400 transition-[background-color,border-color] duration-300 flex items-center gap-2.5 cursor-pointer shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:shadow-[0_0_32px_rgba(139,92,246,0.65)]">
                   <Gamepad2 size={17} className="text-violet-400 group-hover:text-white transition-colors" />
                   <AuroraText>Enter Event Arena</AuroraText>
-                  <ChevronRight size={15} className="text-violet-400 group-hover:translate-x-0.5 group-hover:text-white transition-all" />
+                  <ChevronRight size={15} className="text-violet-400 group-hover:translate-x-0.5 group-hover:text-white transition-[transform,color]" />
                 </button>
               </Link>
             ) : registrationOpen ? (
               <Link href="/register">
-                <button className="group relative px-7 py-3 rounded-2xl bg-white/5 border border-violet-400/50 font-bold text-base backdrop-blur-xl hover:bg-violet-500/15 hover:border-violet-400 transition-all duration-300 flex items-center gap-2.5 cursor-pointer shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:shadow-[0_0_32px_rgba(139,92,246,0.65)]">
+                <button className="group relative px-7 py-3 rounded-2xl bg-white/5 border border-violet-400/50 font-bold text-base backdrop-blur-xl hover:bg-violet-500/15 hover:border-violet-400 transition-[background-color,border-color] duration-300 flex items-center gap-2.5 cursor-pointer shadow-[0_0_18px_rgba(139,92,246,0.35)] hover:shadow-[0_0_32px_rgba(139,92,246,0.65)]">
                   <Zap size={17} className="text-yellow-400 group-hover:text-yellow-300 transition-colors" />
                   <AuroraText>Register Now</AuroraText>
-                  <ChevronRight size={15} className="text-violet-400 group-hover:translate-x-0.5 group-hover:text-white transition-all" />
+                  <ChevronRight size={15} className="text-violet-400 group-hover:translate-x-0.5 group-hover:text-white transition-[transform,color]" />
                 </button>
               </Link>
             ) : (
@@ -96,4 +88,3 @@ export default function HomePage() {
     </div>
   );
 }
-

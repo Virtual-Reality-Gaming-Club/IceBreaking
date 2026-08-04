@@ -9,12 +9,17 @@ interface VideoBackgroundProps {
 export function VideoBackground({ muted = true }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Directly sync muted state to HTML5 video element on every toggle change
+  // Directly sync muted state and ensure video plays reliably on mount/toggle
   useEffect(() => {
     const video = videoRef.current;
     if (video) {
       video.muted = muted;
-      video.play().catch(() => {});
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn("Video background autoplay prevented:", err);
+        });
+      }
     }
   }, [muted]);
 
@@ -29,6 +34,7 @@ export function VideoBackground({ muted = true }: VideoBackgroundProps) {
         overflow: "hidden",
         zIndex: 0,
         pointerEvents: "none",
+        backgroundColor: "#05070e",
       }}
     >
       {/* HTML5 Native Video Background */}
@@ -52,10 +58,11 @@ export function VideoBackground({ muted = true }: VideoBackgroundProps) {
           objectFit: "cover",
           filter: "blur(1px) brightness(0.82) contrast(1.1)",
           pointerEvents: "none",
+          willChange: "transform",
         }}
       />
 
-      {/* Subtle Ambient Overlay Gradient */}
+      {/* Ambient Overlay Gradient */}
       <div
         style={{
           position: "absolute",

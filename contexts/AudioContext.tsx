@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { VideoBackground } from "@/components/ui/VideoBackground";
 
@@ -19,7 +19,7 @@ const AudioContext = createContext<AudioContextType>({
 });
 
 // Pages that display the background video
-const VIDEO_PAGES = ["/", "/register", "/about", "/event"];
+const VIDEO_PAGES = ["/", "/register", "/about", "/event", "/leaderboard"];
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [muted, setMuted] = useState(true);
@@ -32,8 +32,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setMuted((prev) => !prev);
   };
 
+  const value = useMemo(
+    () => ({ muted, setMuted, toggleMute, hasVideo }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [muted, hasVideo]
+  );
+
   return (
-    <AudioContext.Provider value={{ muted, setMuted, toggleMute, hasVideo }}>
+    <AudioContext.Provider value={value}>
       {hasVideo && <VideoBackground muted={muted} />}
       {children}
     </AudioContext.Provider>

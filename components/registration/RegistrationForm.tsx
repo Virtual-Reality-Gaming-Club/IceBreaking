@@ -103,11 +103,6 @@ export function RegistrationForm() {
         localStorage.setItem("ib_reg_number", normalizedReg);
         localStorage.setItem("ib_full_name", normalizedName);
       }
-
-      // Automatically redirect to User Event Panel (/event) after short delay
-      setTimeout(() => {
-        router.push("/event");
-      }, 1400);
     } catch (err: any) {
       console.error("Firestore Registration Error:", err);
       setError(err.message || "Failed to register. Please check your network connection and try again.");

@@ -48,14 +48,14 @@ export function AdminConfirmModal({
               <Button
                 slot="close"
                 variant="tertiary"
-                className="rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-all cursor-pointer"
+                className="rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                 isDisabled={isLoading}
               >
                 {cancelLabel}
               </Button>
               <Button
                 variant="danger"
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 cursor-pointer"
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 shadow-lg shadow-rose-600/30 transition-colors flex items-center gap-2 cursor-pointer"
                 onClick={async () => {
                   await onConfirm();
                   onOpenChange(false);

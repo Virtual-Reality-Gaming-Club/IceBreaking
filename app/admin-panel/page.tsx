@@ -1,19 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
-import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
-import { collection, getDocs, onSnapshot, doc } from "firebase/firestore";
+import dynamic from "next/dynamic";
+import { collection, onSnapshot, doc } from "firebase/firestore";
 import Image from "next/image";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { VideoBackground } from "@/components/ui/VideoBackground";
-import { ChevronDown, Brain } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ChevronDown, Search, Eye, EyeOff, Brain } from "lucide-react";
+import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
+import { quizData, QuizQuestion } from "@/quizcontent/data";
+
+const AdminConfirmModal = dynamic(
+  () => import("@/components/ui/admin-confirm-modal").then((mod) => mod.AdminConfirmModal),
+  { ssr: false }
+);
+
+const SeedDatabaseButton = dynamic(
+  () => import("@/components/SeedDatabaseButton").then((mod) => mod.SeedDatabaseButton),
+  { ssr: false }
+);
+
+const PAGE_SIZE = 25;
+
+const BAR_GRADIENTS = [
+  "from-violet-600 via-indigo-500 to-cyan-400",
+  "from-pink-500 via-rose-500 to-amber-400",
+  "from-emerald-500 via-teal-400 to-cyan-400",
+  "from-amber-400 via-orange-500 to-red-500",
+  "from-purple-500 via-fuchsia-500 to-pink-400",
+] as const;
 
 interface EventItem {
   id: string;
@@ -37,9 +58,6 @@ interface ParticipantItem {
   registeredAt?: any;
 }
 
-import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
-import { AdminConfirmModal } from "@/components/ui/admin-confirm-modal";
-
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -56,13 +74,22 @@ export default function AdminDashboardPage() {
   const [participantsList, setParticipantsList] = useState<ParticipantItem[]>([]);
   const [adminsList, setAdminsList] = useState<AdminUser[]>([]);
   const [pollsList, setPollsList] = useState<any[]>([]);
-  const [quizzesList, setQuizzesList] = useState<any[]>([]);
   const [eventsList, setEventsList] = useState<EventItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools"
+  >("overview");
+
+  // Participant list pagination & search
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [visibleParticipantCount, setVisibleParticipantCount] = useState(PAGE_SIZE);
 
   // Global Settings State
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [globalQuizOpen, setGlobalQuizOpen] = useState(false);
+  const [quizMode, setQuizMode] = useState<"single" | "multiple">("multiple");
+  const [activeQuestionIds, setActiveQuestionIds] = useState<number[]>([]);
+  const [quizResponses, setQuizResponses] = useState<{ [qId: number]: { [regNum: string]: number } }>({});
+  const [expandedDetails, setExpandedDetails] = useState<{ [qId: number]: boolean }>({});
 
   // Poll Form State
   const [pollModalOpen, setPollModalOpen] = useState(false);
@@ -71,20 +98,6 @@ export default function AdminDashboardPage() {
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [pollStatus, setPollStatus] = useState<"active" | "closed" | "draft">("active");
   const [isSavingPoll, setIsSavingPoll] = useState(false);
-
-  // Quiz Form State
-  const [quizModalOpen, setQuizModalOpen] = useState(false);
-  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
-  const [quizTitle, setQuizTitle] = useState("");
-  const [quizDescription, setQuizDescription] = useState("");
-  const [quizStatus, setQuizStatus] = useState<"active" | "closed" | "draft">("active");
-  const [quizTimeLimit, setQuizTimeLimit] = useState(10); // mins
-  const [quizQuestions, setQuizQuestions] = useState<
-    { id: string; question: string; options: string[]; correctAnswerIndex: number; points: number }[]
-  >([
-    { id: "q_1", question: "", options: ["", "", "", ""], correctAnswerIndex: 0, points: 10 }
-  ]);
-  const [isSavingQuiz, setIsSavingQuiz] = useState(false);
 
   // Event Form State
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -105,7 +118,7 @@ export default function AdminDashboardPage() {
   const [editParticipantScore, setEditParticipantScore] = useState(0);
   const [isSavingParticipant, setIsSavingParticipant] = useState(false);
 
-  // Irreversible Action Confirmation Modal State
+  // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -120,6 +133,7 @@ export default function AdminDashboardPage() {
     onConfirm: () => {},
   });
 
+  // Auth verification
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
@@ -139,8 +153,6 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      // Load Dashboard Data for verified admin
-      fetchDashboardData();
       setLoading(false);
     });
 
@@ -156,7 +168,7 @@ export default function AdminDashboardPage() {
       const participantsData: ParticipantItem[] = [];
       snap.forEach((d) => participantsData.push({ id: d.id, ...d.data() } as ParticipantItem));
       setParticipantsList(participantsData);
-      setStats(s => ({ ...s, totalUsers: snap.size }));
+      setStats((s) => ({ ...s, totalUsers: snap.size }));
     });
 
     // 2. Events Realtime
@@ -164,7 +176,7 @@ export default function AdminDashboardPage() {
       const eventsData: EventItem[] = [];
       snap.forEach((d) => eventsData.push({ id: d.id, ...d.data() } as EventItem));
       setEventsList(eventsData);
-      setStats(s => ({ ...s, totalEvents: snap.size }));
+      setStats((s) => ({ ...s, totalEvents: snap.size }));
     });
 
     // 3. Polls Realtime
@@ -174,86 +186,209 @@ export default function AdminDashboardPage() {
       setPollsList(pollsData);
     });
 
-    // 4. Quizzes Realtime
-    const unsubQuizzes = onSnapshot(collection(db, "quizzes"), (snap) => {
-      const quizzesData: any[] = [];
-      snap.forEach((d) => quizzesData.push({ id: d.id, ...d.data() }));
-      setQuizzesList(quizzesData);
-    });
-
-    // 5. Registration Settings Realtime
+    // 4. Registration Settings Realtime
     const unsubRegistration = onSnapshot(doc(db, "settings", "registration"), (docSnap) => {
       if (docSnap.exists()) {
         setRegistrationOpen(!!docSnap.data().isOpen);
       }
     });
 
-    // 6. Global Quiz Toggle Realtime
+    // 5. Global Quiz Settings & Active Questions Realtime
     const unsubQuizToggle = onSnapshot(doc(db, "settings", "quiz"), (docSnap) => {
       if (docSnap.exists()) {
-        setGlobalQuizOpen(!!docSnap.data().isOpen);
+        const data = docSnap.data();
+        setGlobalQuizOpen(!!data.isOpen);
+        setQuizMode(data.mode || "multiple");
+        setActiveQuestionIds(data.activeQuestionIds || []);
       }
+    });
+
+    // 6. Real-time Quiz Responses for Analytics
+    const unsubQuizResponses = onSnapshot(collection(db, "quiz_responses"), (snap) => {
+      const responses: { [qId: number]: { [regNum: string]: number } } = {};
+      snap.forEach((d) => {
+        const qId = Number(d.id);
+        const data = d.data();
+        responses[qId] = data.answers || {};
+      });
+      setQuizResponses(responses);
     });
 
     // 7. Leaderboard Teams
     const unsubLeaderboard = onSnapshot(collection(db, "leaderboard"), (snap) => {
-      setStats(s => ({ ...s, totalTeams: snap.size }));
+      setStats((s) => ({ ...s, totalTeams: snap.size }));
     });
-    
+
     // Admins
-    getAllAdmins().then(admins => {
+    getAllAdmins().then((admins) => {
       setAdminsList(admins);
-      setStats(s => ({ ...s, activeAdmins: admins.length > 0 ? admins.length : 2 }));
+      setStats((s) => ({ ...s, activeAdmins: admins.length > 0 ? admins.length : 2 }));
     });
 
     return () => {
       unsubParticipants();
       unsubEvents();
       unsubPolls();
-      unsubQuizzes();
       unsubRegistration();
       unsubQuizToggle();
+      unsubQuizResponses();
       unsubLeaderboard();
     };
   }, [isAdmin]);
 
-  // Keep these as empty functions to prevent crashes from legacy manual refresh calls
-  const fetchDashboardData = async () => {};
+  // Memoized filtered participants search across full dataset
+  const filteredParticipants = useMemo(() => {
+    const q = participantSearch.trim().toLowerCase();
+    if (!q) return participantsList;
+    return participantsList.filter((p) => {
+      const name = (p.fullName || p.name || "").toLowerCase();
+      const reg = (p.registrationNumber || p.id || "").toLowerCase();
+      return name.includes(q) || reg.includes(q);
+    });
+  }, [participantsList, participantSearch]);
 
-  const fetchRegistrationStatus = async () => {};
-  const fetchEvents = async () => {};
-  const fetchPolls = async () => {};
-  const fetchQuizzes = async () => {};
+  // Paginated participants slice for current view
+  const visibleParticipants = useMemo(() => {
+    return filteredParticipants.slice(0, visibleParticipantCount);
+  }, [filteredParticipants, visibleParticipantCount]);
 
-  const handleToggleRegistration = async () => {
+  const hasMoreParticipants = visibleParticipantCount < filteredParticipants.length;
+
+  const handleLoadMoreParticipants = useCallback(() => {
+    setVisibleParticipantCount((prev) => prev + PAGE_SIZE);
+  }, []);
+
+  const handleToggleRegistration = useCallback(async () => {
     try {
       const { doc, setDoc } = await import("firebase/firestore");
       const nextState = !registrationOpen;
-      await setDoc(doc(db, "settings", "registration"), {
-        isOpen: nextState,
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      await setDoc(
+        doc(db, "settings", "registration"),
+        {
+          isOpen: nextState,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     } catch (err) {
       console.error("Error toggling registration status:", err);
       alert("Failed to update registration status.");
     }
-  };
+  }, [registrationOpen]);
 
-  const handleToggleGlobalQuiz = async () => {
+  // QUIZ CONTROL HANDLERS
+  const handleToggleGlobalQuiz = useCallback(async () => {
     try {
       const { doc, setDoc } = await import("firebase/firestore");
-      await setDoc(doc(db, "settings", "quiz"), {
-        isOpen: !globalQuizOpen,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      alert(`Global Quiz is now ${!globalQuizOpen ? 'OPEN' : 'CLOSED'} for all users`);
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          isOpen: !globalQuizOpen,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     } catch (err) {
       console.error("Error toggling global quiz:", err);
       alert("Failed to toggle global quiz.");
     }
-  };
+  }, [globalQuizOpen]);
 
-  const handleOpenPollModal = (poll?: any) => {
+  const handleSetQuizMode = useCallback(async (mode: "single" | "multiple") => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      let newActive = activeQuestionIds;
+      if (mode === "single" && activeQuestionIds.length > 1) {
+        newActive = [activeQuestionIds[0]];
+      }
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          mode,
+          activeQuestionIds: newActive,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error setting quiz mode:", err);
+    }
+  }, [activeQuestionIds]);
+
+  const handleToggleQuestionActive = useCallback(async (qId: number) => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      let newActive: number[];
+      if (quizMode === "single") {
+        newActive = activeQuestionIds.includes(qId) ? [] : [qId];
+      } else {
+        newActive = activeQuestionIds.includes(qId)
+          ? activeQuestionIds.filter((id) => id !== qId)
+          : [...activeQuestionIds, qId];
+      }
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          activeQuestionIds: newActive,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error toggling question active status:", err);
+    }
+  }, [quizMode, activeQuestionIds]);
+
+  const handleActivateAllQuestions = useCallback(async () => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      const allIds = quizData.map((q) => q.id);
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          mode: "multiple",
+          activeQuestionIds: allIds,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error activating all questions:", err);
+    }
+  }, []);
+
+  const handleDeactivateAllQuestions = useCallback(async () => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          activeQuestionIds: [],
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error deactivating all questions:", err);
+    }
+  }, []);
+
+  const toggleExpandDetails = useCallback((qId: number) => {
+    setExpandedDetails((prev) => ({ ...prev, [qId]: !prev[qId] }));
+  }, []);
+
+  // Map participant reg number to full name for analytics
+  const participantMap = useMemo(() => {
+    const map: { [regNum: string]: string } = {};
+    participantsList.forEach((p) => {
+      const reg = (p.registrationNumber || p.id || "").toUpperCase();
+      map[reg] = p.fullName || p.name || reg;
+    });
+    return map;
+  }, [participantsList]);
+
+  // POLL HANDLERS
+  const handleOpenPollModal = useCallback((poll?: any) => {
     if (poll) {
       setEditingPollId(poll.id);
       setPollQuestion(poll.question || "");
@@ -266,9 +401,9 @@ export default function AdminDashboardPage() {
       setPollStatus("active");
     }
     setPollModalOpen(true);
-  };
+  }, []);
 
-  const handleSavePoll = async () => {
+  const handleSavePoll = useCallback(async () => {
     if (!pollQuestion.trim()) {
       alert("Please enter a poll question.");
       return;
@@ -319,33 +454,32 @@ export default function AdminDashboardPage() {
       }
 
       setPollModalOpen(false);
-      fetchPolls();
     } catch (err) {
       console.error("Error saving poll:", err);
       alert("Failed to save poll. Check console.");
     } finally {
       setIsSavingPoll(false);
     }
-  };
+  }, [pollQuestion, pollOptions, pollStatus, editingPollId, pollsList]);
 
-  const handleTogglePollStatus = async (poll: any) => {
+  const handleTogglePollStatus = useCallback(async (poll: any) => {
     try {
       const { doc, updateDoc } = await import("firebase/firestore");
       const nextStatus = poll.status === "active" ? "closed" : "active";
       await updateDoc(doc(db, "polls", poll.id), { status: nextStatus });
-      fetchPolls();
     } catch (err) {
       console.error("Error updating poll status:", err);
     }
-  };
+  }, []);
 
-  const handleDeletePoll = (poll: any) => {
+  const handleDeletePoll = useCallback((poll: any) => {
     setConfirmModal({
       isOpen: true,
       title: "Delete poll permanently?",
       description: (
         <p>
-          This will permanently delete the poll <strong>&quot;{poll.question}&quot;</strong> and all associated votes. This action cannot be undone.
+          This will permanently delete the poll <strong>&quot;{poll.question}&quot;</strong> and all
+          associated votes. This action cannot be undone.
         </p>
       ),
       confirmLabel: "Delete Poll",
@@ -353,144 +487,15 @@ export default function AdminDashboardPage() {
         try {
           const { doc, deleteDoc } = await import("firebase/firestore");
           await deleteDoc(doc(db, "polls", poll.id));
-          fetchPolls();
         } catch (err) {
           console.error("Error deleting poll:", err);
         }
       },
     });
-  };
+  }, []);
 
-  // QUIZ HANDLERS
-  const handleOpenQuizModal = (quiz?: any) => {
-    if (quiz) {
-      setEditingQuizId(quiz.id);
-      setQuizTitle(quiz.title || "");
-      setQuizDescription(quiz.description || "");
-      setQuizStatus(quiz.status || "active");
-      setQuizTimeLimit(quiz.timeLimit || 10);
-      setQuizQuestions(
-        quiz.questions && quiz.questions.length > 0
-          ? quiz.questions
-          : [{ id: "q_1", question: "", options: ["", "", "", ""], correctAnswerIndex: 0, points: 10 }]
-      );
-    } else {
-      setEditingQuizId(null);
-      setQuizTitle("");
-      setQuizDescription("");
-      setQuizStatus("active");
-      setQuizTimeLimit(10);
-      setQuizQuestions([{ id: "q_1", question: "", options: ["", "", "", ""], correctAnswerIndex: 0, points: 10 }]);
-    }
-    setQuizModalOpen(true);
-  };
-
-  const handleSaveQuiz = async () => {
-    if (!quizTitle.trim()) {
-      alert("Please enter a quiz title.");
-      return;
-    }
-    if (quizQuestions.length === 0) {
-      alert("Please add at least one question to the quiz.");
-      return;
-    }
-
-    for (let i = 0; i < quizQuestions.length; i++) {
-      const q = quizQuestions[i];
-      if (!q.question.trim()) {
-        alert(`Question #${i + 1} text cannot be empty.`);
-        return;
-      }
-      const filledOpts = q.options.filter((o) => o.trim().length > 0);
-      if (filledOpts.length < 2) {
-        alert(`Question #${i + 1} must have at least 2 option choices.`);
-        return;
-      }
-    }
-
-    setIsSavingQuiz(true);
-    try {
-      const { doc, setDoc, updateDoc } = await import("firebase/firestore");
-
-      const sanitizedQuestions = quizQuestions.map((q, idx) => ({
-        id: q.id || `q_${idx + 1}_${Date.now()}`,
-        question: q.question.trim(),
-        options: q.options.map((o) => o.trim()),
-        correctAnswerIndex: Number(q.correctAnswerIndex),
-        points: Number(q.points) || 10,
-      }));
-
-      const totalPoints = sanitizedQuestions.reduce((acc, curr) => acc + curr.points, 0);
-
-      if (editingQuizId) {
-        await updateDoc(doc(db, "quizzes", editingQuizId), {
-          title: quizTitle.trim(),
-          description: quizDescription.trim(),
-          status: quizStatus,
-          timeLimit: Number(quizTimeLimit),
-          questions: sanitizedQuestions,
-          totalPoints,
-          updatedAt: new Date().toISOString(),
-        });
-      } else {
-        const newQuizRef = doc(collection(db, "quizzes"));
-        await setDoc(newQuizRef, {
-          id: newQuizRef.id,
-          title: quizTitle.trim(),
-          description: quizDescription.trim(),
-          status: quizStatus,
-          timeLimit: Number(quizTimeLimit),
-          questions: sanitizedQuestions,
-          totalPoints,
-          createdAt: new Date().toISOString(),
-        });
-      }
-
-      setQuizModalOpen(false);
-      fetchQuizzes();
-    } catch (err) {
-      console.error("Error saving quiz:", err);
-      alert("Failed to save quiz. Check console.");
-    } finally {
-      setIsSavingQuiz(false);
-    }
-  };
-
-  const handleToggleQuizStatus = async (quiz: any) => {
-    try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const nextStatus = quiz.status === "active" ? "closed" : "active";
-      await updateDoc(doc(db, "quizzes", quiz.id), { status: nextStatus });
-      fetchQuizzes();
-    } catch (err) {
-      console.error("Error updating quiz status:", err);
-    }
-  };
-
-  const handleDeleteQuiz = (quiz: any) => {
-    setConfirmModal({
-      isOpen: true,
-      title: "Delete quiz permanently?",
-      description: (
-        <p>
-          This will permanently delete <strong>&quot;{quiz.title}&quot;</strong> and all questions/responses. This action cannot be undone.
-        </p>
-      ),
-      confirmLabel: "Delete Quiz",
-      onConfirm: async () => {
-        try {
-          const { doc, deleteDoc } = await import("firebase/firestore");
-          await deleteDoc(doc(db, "quizzes", quiz.id));
-          fetchQuizzes();
-        } catch (err) {
-          console.error("Error deleting quiz:", err);
-        }
-      },
-    });
-  };
-
-  // PARTICIPANT HANDLERS (Firestore 'participants' collection)
-  const handleOpenParticipantModal = (participant?: ParticipantItem) => {
+  // PARTICIPANT HANDLERS
+  const handleOpenParticipantModal = useCallback((participant?: ParticipantItem) => {
     if (participant) {
       setEditingParticipantId(participant.id);
       setEditParticipantName(participant.fullName || participant.name || "");
@@ -503,9 +508,9 @@ export default function AdminDashboardPage() {
       setEditParticipantScore(0);
     }
     setParticipantModalOpen(true);
-  };
+  }, []);
 
-  const handleSaveParticipant = async () => {
+  const handleSaveParticipant = useCallback(async () => {
     if (!editParticipantReg.trim() || !editParticipantName.trim()) {
       alert("Please provide both Name and Registration Number.");
       return;
@@ -519,13 +524,11 @@ export default function AdminDashboardPage() {
       const { doc, setDoc, deleteDoc, getDoc } = await import("firebase/firestore");
 
       if (editingParticipantId) {
-        // If registration number changed, migrate/create new doc and remove old doc
         if (editingParticipantId !== normalizedReg) {
           const oldDocRef = doc(db, "participants", editingParticipantId);
           const oldDocSnap = await getDoc(oldDocRef);
           const oldData = oldDocSnap.exists() ? oldDocSnap.data() : {};
 
-          // Write new document with updated registration number
           await setDoc(doc(db, "participants", normalizedReg), {
             ...oldData,
             registrationNumber: normalizedReg,
@@ -534,10 +537,8 @@ export default function AdminDashboardPage() {
             updatedAt: new Date().toISOString(),
           });
 
-          // Delete old document
           await deleteDoc(oldDocRef);
         } else {
-          // Registration number unchanged - update existing document
           await setDoc(
             doc(db, "participants", editingParticipantId),
             {
@@ -550,7 +551,6 @@ export default function AdminDashboardPage() {
           );
         }
       } else {
-        // Create new participant document
         await setDoc(doc(db, "participants", normalizedReg), {
           registrationNumber: normalizedReg,
           fullName: normalizedName,
@@ -560,22 +560,22 @@ export default function AdminDashboardPage() {
       }
 
       setParticipantModalOpen(false);
-      fetchDashboardData();
     } catch (err) {
       console.error("Error saving participant:", err);
       alert("Failed to save participant document. Check console.");
     } finally {
       setIsSavingParticipant(false);
     }
-  };
+  }, [editParticipantReg, editParticipantName, editParticipantScore, editingParticipantId]);
 
-  const handleDeleteParticipant = (participantId: string, name: string) => {
+  const handleDeleteParticipant = useCallback((participantId: string, name: string) => {
     setConfirmModal({
       isOpen: true,
       title: "Delete participant permanently?",
       description: (
         <p>
-          This will permanently delete participant entry <strong>&quot;{name || participantId}&quot;</strong> ({participantId}). This action cannot be undone.
+          This will permanently delete participant entry <strong>&quot;{name || participantId}&quot;</strong> (
+          {participantId}). This action cannot be undone.
         </p>
       ),
       confirmLabel: "Delete Participant",
@@ -583,17 +583,16 @@ export default function AdminDashboardPage() {
         try {
           const { doc, deleteDoc } = await import("firebase/firestore");
           await deleteDoc(doc(db, "participants", participantId));
-          fetchDashboardData();
         } catch (err) {
           console.error("Error deleting participant:", err);
           alert("Failed to delete participant entry.");
         }
       },
     });
-  };
+  }, []);
 
-  // EVENT HANDLERS (Firestore 'events' collection)
-  const handleOpenEventModal = (evt?: any) => {
+  // EVENT HANDLERS
+  const handleOpenEventModal = useCallback((evt?: any) => {
     if (evt) {
       setEditingEventId(evt.id);
       setEventTitle(evt.title || "");
@@ -612,9 +611,9 @@ export default function AdminDashboardPage() {
       setEventDate("");
     }
     setEventModalOpen(true);
-  };
+  }, []);
 
-  const handleSaveEvent = async () => {
+  const handleSaveEvent = useCallback(async () => {
     if (!eventTitle.trim()) {
       alert("Please enter an event title.");
       return;
@@ -649,33 +648,32 @@ export default function AdminDashboardPage() {
       }
 
       setEventModalOpen(false);
-      fetchDashboardData();
     } catch (err) {
       console.error("Error saving event:", err);
       alert("Failed to save event.");
     } finally {
       setIsSavingEvent(false);
     }
-  };
+  }, [eventTitle, eventCategory, eventStatus, eventDescription, eventVenue, eventDate, editingEventId]);
 
-  const handleToggleEventStatus = async (evt: any) => {
+  const handleToggleEventStatus = useCallback(async (evt: any) => {
     try {
       const { doc, updateDoc } = await import("firebase/firestore");
       const nextStatus = evt.status === "live" || evt.status === "active" ? "upcoming" : "live";
       await updateDoc(doc(db, "events", evt.id), { status: nextStatus });
-      fetchDashboardData();
     } catch (err) {
       console.error("Error updating event status:", err);
     }
-  };
+  }, []);
 
-  const handleDeleteEvent = (evt: any) => {
+  const handleDeleteEvent = useCallback((evt: any) => {
     setConfirmModal({
       isOpen: true,
       title: "Delete event permanently?",
       description: (
         <p>
-          This will permanently delete event <strong>&quot;{evt.title}&quot;</strong> and all associated data. This action cannot be undone.
+          This will permanently delete event <strong>&quot;{evt.title}&quot;</strong> and all associated data.
+          This action cannot be undone.
         </p>
       ),
       confirmLabel: "Delete Event",
@@ -683,16 +681,12 @@ export default function AdminDashboardPage() {
         try {
           const { doc, deleteDoc } = await import("firebase/firestore");
           await deleteDoc(doc(db, "events", evt.id));
-          fetchDashboardData();
         } catch (err) {
           console.error("Error deleting event:", err);
         }
       },
     });
-  };
-
-
-
+  }, []);
 
   if (loading || !user || !isAdmin) {
     return (
@@ -714,7 +708,15 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "radial-gradient(ellipse at 20% -10%, rgba(124, 58, 237, 0.15), transparent 60%), radial-gradient(ellipse at 80% 110%, rgba(59, 130, 246, 0.1), transparent 60%), #06070a", color: "#f8fafc", fontFamily: "system-ui, sans-serif" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(ellipse at 20% -10%, rgba(124, 58, 237, 0.15), transparent 60%), radial-gradient(ellipse at 80% 110%, rgba(59, 130, 246, 0.1), transparent 60%), #06070a",
+        color: "#f8fafc",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
       {/* Top Navbar */}
       <header className="min-h-[64px] sm:h-[72px] border-b border-violet-500/25 bg-[#0a0d18]/85 backdrop-blur-2xl px-4 sm:px-9 flex items-center justify-between sticky top-0 z-50 shadow-[0_4px_30px_rgba(0,0,0,0.5),0_0_20px_rgba(124,58,237,0.1)] flex-wrap gap-2 py-2 sm:py-0">
         <Link href="/" className="flex items-center gap-3.5 hover:opacity-90 transition-opacity no-underline">
@@ -727,71 +729,50 @@ export default function AdminDashboardPage() {
             priority
           />
           <div>
-            <div className="group relative flex items-center justify-center rounded-full px-3.5 py-1 shadow-[inset_0_-8px_10px_#8fdfff1f] transition-shadow duration-500 ease-out hover:shadow-[inset_0_-5px_10px_#8fdfff3f] border border-violet-500/30 bg-slate-950/60">
-              <span
-                className="animate-gradient absolute inset-0 block h-full w-full rounded-[inherit] bg-gradient-to-r from-[#ffaa40]/50 via-[#9c40ff]/50 to-[#ffaa40]/50 bg-[length:300%_100%] p-[1px]"
-                style={{
-                  WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                  WebkitMaskComposite: "destination-out",
-                  mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-                  maskComposite: "subtract",
-                  WebkitClipPath: "padding-box",
-                }}
-              />
+            <div className="group relative flex items-center justify-center rounded-full px-3.5 py-1 border border-violet-500/30 bg-slate-950/60">
               <AnimatedGradientText className="text-sm font-extrabold tracking-wide">
                 VRGC · VIT Bhopal
               </AnimatedGradientText>
             </div>
-            <span style={{ fontSize: "0.72rem", color: "#a78bfa", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", display: "block", marginTop: "2px", textAlign: "left" }}>
+            <span
+              style={{
+                fontSize: "0.72rem",
+                color: "#a78bfa",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                display: "block",
+                marginTop: "2px",
+                textAlign: "left",
+              }}
+            >
               IceBreaking 2026 Dashboard
             </span>
           </div>
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-5">
-          {/* User Profile Avatar & Info */}
           <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1423]/60 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-violet-500/25">
             <Avatar className="w-7 h-7 sm:w-10 sm:h-10">
-              <AvatarImage
-                src={user?.photoURL || undefined}
-                alt={user?.displayName || "Admin Avatar"}
-              />
-              <AvatarFallback className="bg-violet-900 text-violet-200 font-bold text-xs sm:text-base">
-                {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
+              <AvatarFallback className="bg-gradient-to-br from-violet-600 to-indigo-900 text-white font-black text-xs sm:text-base border border-violet-400/30">
+                {user.email?.charAt(0).toUpperCase() || "A"}
               </AvatarFallback>
             </Avatar>
-
-            <div className="text-left hidden xs:block sm:block">
-              <p className="m-0 text-xs sm:text-sm font-extrabold text-slate-100 leading-tight">
-                {user?.displayName
-                  ? user.displayName.replace(/\b[0-9]{2}[A-Za-z]{3}[0-9]{5}\b/gi, "").trim()
-                  : "Admin User"}
-              </p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold text-[10px] px-1.5 py-0">
-                  👑 Admin
-                </Badge>
-              </div>
+            <div className="hidden sm:block text-left">
+              <span className="block text-xs font-bold text-slate-200 truncate max-w-[140px]">
+                {user.email}
+              </span>
+              <span className="block text-[10px] font-black text-emerald-400 uppercase tracking-wider">
+                👑 Superadmin
+              </span>
             </div>
           </div>
-
-          <button
-            onClick={async () => {
-              await signOut(auth);
-              router.push("/admin-panel/login");
-            }}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-red-500/15 text-red-300 border border-red-500/30 rounded-xl cursor-pointer hover:bg-red-500/30 hover:text-white transition-all shadow-sm"
-          >
-            🚪 Sign Out
-          </button>
         </div>
       </header>
 
       <div className="flex flex-col md:flex-row min-h-[calc(100vh-72px)]">
-        {/* Navigation Sidebar (Desktop vertical list & Mobile Dropdown menu) */}
+        {/* Sidebar */}
         <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-violet-500/20 bg-slate-950/80 md:bg-slate-950/40 backdrop-blur-2xl p-3 md:p-5 flex flex-col gap-2 shrink-0 sticky top-[64px] sm:top-[72px] z-40">
-          
-          {/* Mobile Dropdown Select */}
           <div className="md:hidden relative w-full">
             <label className="text-[10px] uppercase font-bold text-violet-400 tracking-wider mb-1 block px-1">
               Navigate Section
@@ -807,29 +788,31 @@ export default function AdminDashboardPage() {
                     setActiveTab(selectedVal as any);
                   }
                 }}
-                className="w-full appearance-none bg-slate-900/90 border border-violet-400/50 text-white text-xs font-bold py-2.5 pl-3.5 pr-10 rounded-xl outline-none backdrop-blur-xl shadow-lg focus:ring-2 focus:ring-violet-500"
+                className="w-full appearance-none bg-slate-900/90 border border-violet-400/50 text-white text-xs font-bold py-3 pl-3.5 pr-10 rounded-xl outline-none backdrop-blur-xl shadow-lg focus:ring-2 focus:ring-violet-500 min-h-[44px]"
               >
                 <option value="overview">📊 Overview</option>
                 <option value="leaderboard">🏆 Live Leaderboard ↗ (Opens New Tab)</option>
                 <option value="events">🎮 Manage Events</option>
                 <option value="polls">📊 Manage Polls</option>
-                <option value="quizzes">🧠 Manage Quizzes</option>
+                <option value="quizzes">🧠 Live Quiz Control</option>
                 <option value="users">👥 Participants</option>
                 <option value="admins">🛡️ Admin Roster</option>
                 <option value="tools">⚙️ Database Tools</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-300 pointer-events-none" size={16} />
+              <ChevronDown
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-violet-300 pointer-events-none"
+                size={16}
+              />
             </div>
           </div>
 
-          {/* Desktop Navigation List */}
           <div className="hidden md:flex flex-col gap-2 w-full">
             {[
               { id: "overview", label: "📊 Overview" },
               { id: "leaderboard", label: "🏆 Live Leaderboard ↗", external: true },
               { id: "events", label: "🎮 Manage Events" },
               { id: "polls", label: "📊 Manage Polls" },
-              { id: "quizzes", label: "🧠 Manage Quizzes" },
+              { id: "quizzes", label: "🧠 Live Quiz Control" },
               { id: "users", label: "👥 Participants" },
               { id: "admins", label: "🛡️ Admin Roster" },
               { id: "tools", label: "⚙️ Database Tools" },
@@ -845,9 +828,9 @@ export default function AdminDashboardPage() {
                       setActiveTab(item.id as any);
                     }
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-between min-h-[44px] ${
                     isActive
-                      ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white shadow-[0_0_20px_rgba(124,58,237,0.25)]"
+                      ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white"
                       : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
                   }`}
                 >
@@ -861,7 +844,7 @@ export default function AdminDashboardPage() {
           <div className="mt-auto pt-4 border-t border-white/[0.08] hidden md:block">
             <Link
               href="/"
-              className="text-violet-400 hover:text-violet-300 text-xs font-bold flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.04] transition-all"
+              className="text-violet-400 hover:text-violet-300 text-xs font-bold flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/[0.04] transition-colors"
             >
               <span>← Return to Main Site</span>
             </Link>
@@ -873,20 +856,30 @@ export default function AdminDashboardPage() {
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div>
-              <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.02em" }}>Dashboard Overview</h1>
+              <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.02em" }}>
+                Dashboard Overview
+              </h1>
               <p style={{ color: "#94a3b8", fontSize: "0.98rem", marginBottom: "36px" }}>
                 Real-time operational metrics & platform controls for IceBreaking 2026.
               </p>
 
-              {/* Event Registration Status Control Banner */}
-              <Card className={`${registrationOpen ? "bg-emerald-950/20 border-emerald-500/30" : "bg-red-950/20 border-red-500/30"} shadow-xl mb-8 border backdrop-blur-xl`}>
+              {/* Control Banner */}
+              <Card
+                className={`${
+                  registrationOpen ? "bg-emerald-950/20 border-emerald-500/30" : "bg-red-950/20 border-red-500/30"
+                } shadow-xl mb-8 border backdrop-blur-xl`}
+              >
                 <CardContent className="p-6 flex flex-row items-center justify-between flex-wrap gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1.5">
-                      <span className="text-base font-black text-white">
-                        📝 Event Registration Status:
-                      </span>
-                      <Badge className={registrationOpen ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold px-3 py-0.5 text-xs" : "bg-red-500/20 text-red-300 border-red-500/40 font-bold px-3 py-0.5 text-xs"}>
+                      <span className="text-base font-black text-white">📝 Event Registration Status:</span>
+                      <Badge
+                        className={
+                          registrationOpen
+                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold px-3 py-0.5 text-xs"
+                            : "bg-red-500/20 text-red-300 border-red-500/40 font-bold px-3 py-0.5 text-xs"
+                        }
+                      >
                         {registrationOpen ? "🟢 OPEN (Public Can Register)" : "🔒 CLOSED (Registration Locked)"}
                       </Badge>
                     </div>
@@ -899,205 +892,66 @@ export default function AdminDashboardPage() {
 
                   <button
                     onClick={handleToggleRegistration}
-                    className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg text-white ${registrationOpen ? "bg-red-600 hover:bg-red-500 shadow-red-600/30" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30"}`}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs transition-colors shadow-lg text-white cursor-pointer min-h-[44px] ${
+                      registrationOpen ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"
+                    }`}
                   >
                     {registrationOpen ? "🔒 Close Registration" : "🟢 Open Registration"}
                   </button>
                 </CardContent>
               </Card>
 
-              {/* Metrics Grid — Ultra-concise on mobile */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-5 mb-6">
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-5 mb-6">
                 {[
-                  { label: "Participants", value: stats.totalUsers || 2, color: "#818cf8", accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
-                  { label: "Active Events", value: eventsList.length, color: "#38bdf8", accent: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
-                  { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
-                  { label: "Active Quizzes", value: quizzesList.length, color: "#c084fc", accent: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
-                  { label: "Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+                  {
+                    label: "Participants",
+                    value: stats.totalUsers || participantsList.length,
+                    color: "#818cf8",
+                    accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
+                  },
+                  {
+                    label: "Active Events",
+                    value: eventsList.length,
+                    color: "#38bdf8",
+                    accent: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+                  },
+                  {
+                    label: "Active Polls",
+                    value: pollsList.length,
+                    color: "#fbbf24",
+                    accent: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+                  },
+                  {
+                    label: "Admins",
+                    value: stats.activeAdmins || 2,
+                    color: "#34d399",
+                    accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+                  },
                 ].map((card, idx) => (
-                  <Card key={idx} className="bg-white/[0.02] border-white/[0.08] shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-2xl relative overflow-hidden transition-all duration-300 hover:border-violet-400/50 ring-1 ring-white/[0.04] p-2.5 sm:p-5 flex flex-col justify-between">
+                  <Card
+                    key={idx}
+                    className="bg-white/[0.02] border-white/[0.08] backdrop-blur-2xl transition-colors hover:border-violet-400/50 p-3 sm:p-5 flex flex-col justify-between"
+                  >
                     <div>
-                      <CardDescription className="text-slate-400 font-bold text-[9px] sm:text-xs uppercase tracking-wider truncate mb-0.5">{card.label}</CardDescription>
+                      <CardDescription className="text-slate-400 font-bold text-[9px] sm:text-xs uppercase tracking-wider truncate mb-0.5">
+                        {card.label}
+                      </CardDescription>
                       <CardTitle className="text-xl sm:text-3xl font-black text-white" style={{ color: card.color }}>
                         {card.value}
                       </CardTitle>
                     </div>
                     <div className="mt-1 sm:mt-2">
-                      <Badge variant="outline" className={`${card.accent} font-bold text-[8px] sm:text-[11px] px-1.5 py-0 sm:py-0.5 whitespace-nowrap`}>
+                      <Badge
+                        variant="outline"
+                        className={`${card.accent} font-bold text-[8px] sm:text-[11px] px-1.5 py-0 sm:py-0.5 whitespace-nowrap`}
+                      >
                         Live Data
                       </Badge>
                     </div>
                   </Card>
                 ))}
               </div>
-
-              {/* Registered System Admins Box */}
-              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl p-4 sm:p-6 backdrop-blur-2xl ring-1 ring-white/[0.04] overflow-hidden">
-                <CardHeader className="px-0 pt-0 pb-4 sm:pb-6 border-b border-white/[0.08] flex flex-row items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl font-black text-white">Registered Superadmins</CardTitle>
-                    <CardDescription className="text-slate-400 mt-0.5 sm:mt-1 text-xs sm:text-sm">Verified administrator roster with full system privileges.</CardDescription>
-                  </div>
-                  <Badge variant="outline" className="bg-violet-500/15 text-violet-300 border-violet-500/40 px-2.5 sm:px-3.5 py-0.5 sm:py-1 font-bold text-[10px] sm:text-xs">
-                    🛡️ 2 Active Admins
-                  </Badge>
-                </CardHeader>
-
-                <CardContent className="px-0 pt-3 sm:pt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
-                    {[
-                      { name: "Jaiyansh", email: "jaiyansh.25bcy10268@vitbhopal.ac.in", role: "Superadmin", initial: "J", bg: "from-violet-600 to-indigo-900" },
-                      { name: "Abhinav Mishra", email: "abhinav.25bcy10254@vitbhopal.ac.in", role: "Superadmin", initial: "A", bg: "from-blue-600 to-indigo-900" },
-                    ].map((admin, idx) => (
-                      <div
-                        key={idx}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all shadow-lg backdrop-blur-md gap-2.5 overflow-hidden"
-                      >
-                        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0 w-full sm:w-auto">
-                          <Avatar className="w-9 h-9 sm:w-12 sm:h-12 shrink-0">
-                            <AvatarFallback className={`bg-gradient-to-br ${admin.bg} text-white font-black text-sm sm:text-lg border border-white/20`}>
-                              {admin.initial}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <strong className="text-xs sm:text-base font-black text-white block truncate">{admin.name}</strong>
-                            <span className="text-[10px] sm:text-xs text-slate-400 font-semibold block mt-0.5 truncate">{admin.email}</span>
-                          </div>
-                        </div>
-
-                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold px-2 sm:px-3 py-0.5 sm:py-1 text-[9px] sm:text-xs shrink-0 self-start sm:self-auto">
-                          👑 {admin.role}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* LEADERBOARD TAB */}
-          {activeTab === "leaderboard" && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center flex-wrap gap-4 pb-2">
-                <div>
-                  <h1 className="text-2xl font-black text-white tracking-tight m-0">Live Leaderboard</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">Realtime participant score rankings & standings</p>
-                </div>
-                <Badge className="bg-violet-500/15 text-violet-300 border-violet-500/40 font-extrabold text-xs px-4 py-1.5 shadow-md backdrop-blur-md">
-                  🏆 Total Ranked: {[...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)).length} Participants
-                </Badge>
-              </div>
-
-              {/* Top 3 Podium Feature Cards */}
-              {(() => {
-                const sorted = [...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
-                const top1 = sorted[0];
-                const top2 = sorted[1];
-                const top3 = sorted[2];
-                if (!top1) return null;
-
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {/* Rank 2 - Silver */}
-                    {top2 ? (
-                      <div className="bg-white/[0.03] border border-slate-300/30 rounded-3xl p-6 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden order-2 md:order-1 ring-1 ring-white/[0.05]">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-200 via-slate-300 to-slate-500 text-slate-950 font-black flex items-center justify-center text-base shadow-lg shadow-slate-400/20 mb-3">
-                          🥈 #2
-                        </div>
-                        <h4 className="text-base font-black text-white mb-0.5 tracking-tight">{top2.fullName || top2.name}</h4>
-                        <span className="text-xs font-mono text-slate-400 font-bold mb-3">{top2.registrationNumber || top2.id}</span>
-                        <Badge className="bg-slate-300/20 text-slate-200 border-slate-300/40 font-black text-xs px-4 py-1">
-                          {top2.totalScore || 0} PTS
-                        </Badge>
-                      </div>
-                    ) : <div />}
-
-                    {/* Rank 1 - Gold */}
-                    <div className="bg-amber-500/10 border border-amber-400/50 rounded-3xl p-7 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-[0_0_50px_rgba(245,158,11,0.2)] relative overflow-hidden order-1 md:order-2 ring-1 ring-amber-400/40 -translate-y-1">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-300 via-amber-400 to-yellow-500 text-slate-950 font-black flex items-center justify-center text-xl shadow-xl shadow-amber-500/40 mb-3">
-                        👑 #1
-                      </div>
-                      <h4 className="text-lg font-black text-amber-200 mb-0.5 tracking-tight">{top1.fullName || top1.name}</h4>
-                      <span className="text-xs font-mono text-amber-400/80 font-bold mb-3">{top1.registrationNumber || top1.id}</span>
-                      <Badge className="bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 border-amber-300 font-black text-xs px-4 py-1.5 shadow-lg shadow-amber-400/20">
-                        {top1.totalScore || 0} PTS
-                      </Badge>
-                    </div>
-
-                    {/* Rank 3 - Bronze */}
-                    {top3 ? (
-                      <div className="bg-white/[0.03] border border-amber-700/40 rounded-3xl p-6 backdrop-blur-2xl flex flex-col items-center justify-center text-center shadow-lg relative overflow-hidden order-3 ring-1 ring-white/[0.05]">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 text-amber-100 font-black flex items-center justify-center text-base shadow-lg shadow-amber-900/30 mb-3">
-                          🥉 #3
-                        </div>
-                        <h4 className="text-base font-black text-white mb-0.5 tracking-tight">{top3.fullName || top3.name}</h4>
-                        <span className="text-xs font-mono text-amber-600/80 font-bold mb-3">{top3.registrationNumber || top3.id}</span>
-                        <Badge className="bg-amber-700/20 text-amber-300 border-amber-700/40 font-black text-xs px-4 py-1">
-                          {top3.totalScore || 0} PTS
-                        </Badge>
-                      </div>
-                    ) : <div />}
-                  </div>
-                );
-              })()}
-
-              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl backdrop-blur-2xl p-6 ring-1 ring-white/[0.04] rounded-3xl">
-                {[...participantsList].sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0)).length > 0 ? (
-                  <div className="space-y-3">
-                    {[...participantsList]
-                      .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
-                      .map((p, idx) => {
-                        const rank = idx + 1;
-                        const pName = p.fullName || p.name || "Participant";
-                        const pReg = p.registrationNumber || p.id;
-                        const score = p.totalScore || 0;
-
-                        return (
-                          <div
-                            key={p.id}
-                            className={`flex items-center justify-between p-4 rounded-2xl border transition-all shadow-md flex-wrap gap-3 backdrop-blur-md ${
-                              rank === 1
-                                ? "bg-amber-500/10 border-amber-400/40 shadow-[0_0_20px_rgba(245,158,11,0.15)]"
-                                : rank === 2
-                                ? "bg-white/[0.04] border-slate-300/30"
-                                : rank === 3
-                                ? "bg-white/[0.03] border-amber-700/30"
-                                : "bg-white/[0.02] border-white/[0.06] hover:border-violet-400/40"
-                            }`}
-                          >
-                            <div className="flex items-center gap-4">
-                              <div
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
-                                  rank === 1
-                                    ? "bg-gradient-to-br from-amber-300 to-amber-500 text-slate-950 shadow-md shadow-amber-400/30 ring-2 ring-amber-400/40"
-                                    : rank === 2
-                                    ? "bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950 shadow-md"
-                                    : rank === 3
-                                    ? "bg-gradient-to-br from-amber-600 to-amber-800 text-white shadow-md"
-                                    : "bg-white/[0.06] text-violet-300 border border-white/10"
-                                }`}
-                              >
-                                #{rank}
-                              </div>
-                              <div>
-                                <h4 className="text-base font-black text-white m-0 leading-snug">{pName}</h4>
-                                <span className="text-xs font-mono text-violet-400 font-bold block mt-0.5">{pReg}</span>
-                              </div>
-                            </div>
-
-                            <div className="text-right">
-                              <span className="text-xl font-black text-sky-400 block leading-none drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]">{score}</span>
-                              <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider">PTS</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                ) : (
-                  <p className="text-slate-400 text-center py-8">No participant scores found.</p>
-                )}
-              </Card>
             </div>
           )}
 
@@ -1107,11 +961,13 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Manage Events</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">View, create, edit, or update status of IceBreaking event activities.</p>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">
+                    View, create, edit, or update status of IceBreaking event activities.
+                  </p>
                 </div>
                 <button
                   onClick={() => handleOpenEventModal()}
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer min-h-[44px]"
                 >
                   ➕ Create New Event
                 </button>
@@ -1120,19 +976,33 @@ export default function AdminDashboardPage() {
               <div className="grid gap-4">
                 {eventsList.length > 0 ? (
                   eventsList.map((evt: any) => (
-                    <Card key={evt.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-blue-500/40 p-4 sm:p-6">
+                    <Card
+                      key={evt.id}
+                      className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-colors hover:border-blue-500/40 p-4 sm:p-6"
+                    >
                       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 font-extrabold text-[10px] sm:text-[11px] px-2.5 py-0.5">
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-500/10 text-blue-400 border-blue-500/30 font-extrabold text-[10px] sm:text-[11px] px-2.5 py-0.5"
+                            >
                               {evt.category || "General"}
                             </Badge>
-                            <Badge className={evt.status === "live" || evt.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-[10px] sm:text-[11px]"}>
+                            <Badge
+                              className={
+                                evt.status === "live" || evt.status === "active"
+                                  ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]"
+                                  : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-[10px] sm:text-[11px]"
+                              }
+                            >
                               ● {(evt.status || "upcoming").toUpperCase()}
                             </Badge>
                           </div>
                           <h3 className="m-0 text-base sm:text-xl font-black text-white">{evt.title}</h3>
-                          {evt.description && <p className="m-0 text-slate-400 text-xs sm:text-sm leading-relaxed">{evt.description}</p>}
+                          {evt.description && (
+                            <p className="m-0 text-slate-400 text-xs sm:text-sm leading-relaxed">{evt.description}</p>
+                          )}
                           <div className="flex items-center gap-4 text-xs text-slate-300 font-semibold flex-wrap">
                             {evt.date && <span>📅 {evt.date}</span>}
                             {evt.venue && <span>📍 {evt.venue}</span>}
@@ -1142,19 +1012,19 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                           <button
                             onClick={() => handleToggleEventStatus(evt)}
-                            className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
+                            className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-colors text-center cursor-pointer min-h-[44px]"
                           >
                             {evt.status === "live" || evt.status === "active" ? "Pause/Upcoming" : "Set Live"}
                           </button>
                           <button
                             onClick={() => handleOpenEventModal(evt)}
-                            className="px-3 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
                           >
                             ✏️ Edit
                           </button>
                           <button
                             onClick={() => handleDeleteEvent(evt)}
-                            className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
+                            className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
                           >
                             🗑️ Delete
                           </button>
@@ -1167,7 +1037,7 @@ export default function AdminDashboardPage() {
                     <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No events found in database.</p>
                     <button
                       onClick={() => handleOpenEventModal()}
-                      className="bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
+                      className="bg-blue-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer min-h-[44px]"
                     >
                       Create First Event
                     </button>
@@ -1183,11 +1053,13 @@ export default function AdminDashboardPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Polls Management</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">Create, edit, toggle active status, or delete audience polls.</p>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">
+                    Create, edit, toggle active status, or delete audience polls.
+                  </p>
                 </div>
                 <button
                   onClick={() => handleOpenPollModal()}
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer min-h-[44px]"
                 >
                   ➕ Create New Poll
                 </button>
@@ -1201,85 +1073,80 @@ export default function AdminDashboardPage() {
                       : poll.totalVotes || 0;
 
                     return (
-                      <Card key={poll.id} className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-all hover:border-violet-500/40 p-4 sm:p-6">
+                      <Card
+                        key={poll.id}
+                        className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl transition-colors hover:border-violet-500/40 p-4 sm:p-6"
+                      >
                         <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className={poll.status === "active" ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]" : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[10px] sm:text-[11px]"}>
+                              <Badge
+                                className={
+                                  poll.status === "active"
+                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-black text-[10px] sm:text-[11px]"
+                                    : "bg-red-500/15 text-red-400 border-red-500/30 font-black text-[10px] sm:text-[11px]"
+                                }
+                              >
                                 {poll.status === "active" ? "🟢 Active Poll" : "🔴 Closed"}
                               </Badge>
                               <span className="text-xs text-slate-400 font-bold">Total Votes: {totalVotes}</span>
                             </div>
-                            <h3 className="m-0 text-base sm:text-xl font-black text-white">
-                              {poll.question}
-                            </h3>
+                            <h3 className="m-0 text-base sm:text-xl font-black text-white">{poll.question}</h3>
                           </div>
 
                           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
                             <button
                               onClick={() => handleTogglePollStatus(poll)}
-                              className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-all text-center"
+                              className="flex-1 sm:flex-none px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs transition-colors text-center cursor-pointer min-h-[44px]"
                             >
                               {poll.status === "active" ? "Pause/Close" : "Set Active"}
                             </button>
                             <button
                               onClick={() => handleOpenPollModal(poll)}
-                              className="px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 font-bold text-xs transition-all"
+                              className="px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
                             >
                               ✏️ Edit
                             </button>
                             <button
                               onClick={() => handleDeletePoll(poll)}
-                              className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-all"
+                              className="px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
                             >
                               🗑️ Delete
                             </button>
                           </div>
                         </div>
 
-                        {/* Animated & Colorful Bar Graph Results */}
-                        <div className="space-y-3.5 mt-5 pt-4 border-t border-white/[0.08]">
-                          <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                            <span>Option Response breakdown</span>
-                            <span className="text-violet-400">Total: {totalVotes} votes</span>
-                          </div>
-
+                        {/* Bar Graph Breakdown */}
+                        <div className="space-y-3 mt-4 pt-4 border-t border-white/[0.08]">
                           {poll.options?.map((opt: any, idx: number) => {
                             const votes = opt.votes || 0;
                             const percentage = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
-                            
-                            // Distinct vibrant gradient palette for each option bar
-                            const barGradients = [
-                              "from-violet-600 via-indigo-500 to-cyan-400 shadow-[0_0_15px_rgba(139,92,246,0.4)]",
-                              "from-pink-500 via-rose-500 to-amber-400 shadow-[0_0_15px_rgba(244,63,94,0.4)]",
-                              "from-emerald-500 via-teal-400 to-cyan-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]",
-                              "from-amber-400 via-orange-500 to-red-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]",
-                              "from-purple-500 via-fuchsia-500 to-pink-400 shadow-[0_0_15px_rgba(217,70,239,0.4)]",
-                            ];
-                            const currentGradient = barGradients[idx % barGradients.length];
+                            const currentGradient = BAR_GRADIENTS[idx % BAR_GRADIENTS.length];
 
                             return (
-                              <div key={idx} className="bg-slate-900/80 p-3.5 rounded-2xl border border-white/[0.08] relative overflow-hidden backdrop-blur-md">
-                                <div className="flex justify-between items-center text-xs sm:text-sm font-bold mb-2 z-10 relative">
+                              <div
+                                key={idx}
+                                className="bg-slate-900/80 p-3 rounded-2xl border border-white/[0.08]"
+                              >
+                                <div className="flex justify-between items-center text-xs font-bold mb-1.5">
                                   <span className="text-white flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center font-black text-[10px] text-violet-300">
+                                    <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center text-[10px] text-violet-300">
                                       {String.fromCharCode(65 + idx)}
                                     </span>
                                     <span>{opt.text}</span>
                                   </span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-slate-400 text-xs font-semibold">{votes} votes</span>
-                                    <span className="px-2 py-0.5 rounded-full bg-white/10 text-violet-200 font-extrabold text-xs border border-white/10">
-                                      {percentage}%
-                                    </span>
-                                  </div>
+                                  <span className="text-slate-400 text-xs font-semibold">
+                                    {votes} votes ({percentage}%)
+                                  </span>
                                 </div>
-
-                                {/* Dynamic Animated Bar Graph */}
-                                <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden p-0.5 border border-white/[0.06] relative">
+                                <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06]">
                                   <div
-                                    className={`h-full bg-gradient-to-r ${currentGradient} rounded-full transition-all duration-1000 ease-out`}
-                                    style={{ width: `${percentage}%` }}
+                                    className={`h-full bg-gradient-to-r ${currentGradient} rounded-full origin-left`}
+                                    style={{
+                                      transform: `scaleX(${percentage / 100})`,
+                                      transition: "transform 700ms ease-out",
+                                      willChange: "transform",
+                                    }}
                                   />
                                 </div>
                               </div>
@@ -1294,7 +1161,7 @@ export default function AdminDashboardPage() {
                     <p style={{ color: "#94a3b8", fontSize: "1rem", margin: "0 0 16px" }}>No active or created polls yet.</p>
                     <button
                       onClick={() => handleOpenPollModal()}
-                      className="bg-violet-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl"
+                      className="bg-violet-600 text-white font-bold text-xs px-5 py-2.5 rounded-xl cursor-pointer min-h-[44px]"
                     >
                       Create First Poll
                     </button>
@@ -1304,48 +1171,264 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* QUIZZES TAB */}
+          {/* LIVE QUIZ CONTROL SYSTEM TAB */}
           {activeTab === "quizzes" && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Quiz Management</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">Easily toggle the static hardcoded quiz for all users.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0 flex items-center gap-2">
+                    <Brain className="text-purple-400" size={26} />
+                    <span>Live Quiz Control & Real-time Analytics</span>
+                  </h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">
+                    Control active question states live across all participant screens with real-time response analytics.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleActivateAllQuestions}
+                    className="px-3.5 py-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
+                  >
+                    ⚡ Activate All (15)
+                  </button>
+                  <button
+                    onClick={handleDeactivateAllQuestions}
+                    className="px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
+                  >
+                    🛑 Deactivate All
+                  </button>
                 </div>
               </div>
 
-              <Card className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl p-6 sm:p-10 text-center max-w-2xl mx-auto">
-                <div className="mb-6">
-                  <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-4 ${globalQuizOpen ? 'bg-emerald-500/20 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]' : 'bg-red-500/20 text-red-400 shadow-[0_0_30px_rgba(239,68,68,0.3)]'}`}>
-                    <Brain size={40} />
+              {/* GLOBAL QUIZ CONTROLS & MODE SELECTOR */}
+              <Card className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl p-5 sm:p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-black text-white">Global Arena Quiz Switch:</span>
+                      <Badge className={globalQuizOpen ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : "bg-red-500/20 text-red-300 border-red-500/40"}>
+                        {globalQuizOpen ? "🟢 QUIZ ARENA OPEN" : "🔒 QUIZ ARENA CLOSED"}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Active Questions: <strong className="text-purple-300 font-extrabold">{activeQuestionIds.length}</strong> of 15 Live
+                    </p>
                   </div>
-                  <h3 className="text-2xl font-black text-white mb-2">Global Quiz Access</h3>
-                  <p className="text-slate-400 text-sm max-w-md mx-auto">
-                    Toggle this to open or close the hardcoded local quiz for all active participants on the user side.
-                  </p>
+
+                  <div className="flex items-center gap-3 flex-wrap w-full md:w-auto">
+                    {/* Mode Selector */}
+                    <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800">
+                      <button
+                        onClick={() => handleSetQuizMode("single")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                          quizMode === "single"
+                            ? "bg-purple-600 text-white shadow-md"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Single Question Mode
+                      </button>
+                      <button
+                        onClick={() => handleSetQuizMode("multiple")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                          quizMode === "multiple"
+                            ? "bg-purple-600 text-white shadow-md"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        Multiple Active Mode
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={handleToggleGlobalQuiz}
+                      className={`px-5 py-2.5 rounded-xl font-black text-xs transition-colors shadow-lg cursor-pointer min-h-[40px] ${
+                        globalQuizOpen
+                          ? "bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800"
+                          : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white"
+                      }`}
+                    >
+                      {globalQuizOpen ? "🔒 Lock Quiz Arena" : "🔓 Open Quiz Arena"}
+                    </button>
+                  </div>
                 </div>
-                
-                <button
-                  onClick={handleToggleGlobalQuiz}
-                  className={`px-8 py-4 rounded-xl font-black text-sm shadow-xl transition-all cursor-pointer flex items-center justify-center gap-3 w-full sm:w-auto mx-auto ${
-                    globalQuizOpen
-                      ? "bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300"
-                      : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-600/30"
-                  }`}
-                >
-                  {globalQuizOpen ? (
-                    <>
-                      <div className="text-rose-400">🔒</div>
-                      <span>Close Quiz for Users</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-emerald-400">🔓</div>
-                      <span>Open Quiz for Users</span>
-                    </>
-                  )}
-                </button>
               </Card>
+
+              {/* HARDCODED QUIZ QUESTION ROSTER & REAL-TIME ANALYTICS */}
+              <div className="grid gap-5">
+                {quizData.map((q: QuizQuestion) => {
+                  const isActive = activeQuestionIds.includes(q.id);
+                  const responses = quizResponses[q.id] || {};
+                  const responseEntries = Object.entries(responses);
+                  const totalResponses = responseEntries.length;
+
+                  // Option-wise tally
+                  const optionCounts = q.options.map((_, optIdx) => {
+                    return responseEntries.filter(([, selectedIdx]) => selectedIdx === optIdx).length;
+                  });
+
+                  // Correct answers tally & accuracy
+                  const correctCount = responseEntries.filter(([, selectedIdx]) => selectedIdx === q.correctAnswerIndex).length;
+                  const accuracyPct = totalResponses > 0 ? Math.round((correctCount / totalResponses) * 100) : 0;
+                  const unansweredCount = Math.max(0, (stats.totalUsers || participantsList.length) - totalResponses);
+
+                  const isExpanded = Boolean(expandedDetails[q.id]);
+
+                  return (
+                    <Card
+                      key={q.id}
+                      className={`bg-slate-950/80 backdrop-blur-xl transition-colors p-5 sm:p-6 border ${
+                        isActive ? "border-purple-500/50 ring-1 ring-purple-500/20" : "border-slate-800/80 opacity-90"
+                      }`}
+                    >
+                      {/* Top Header */}
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 font-black text-xs">
+                              Question #{q.id}
+                            </Badge>
+                            <Badge className={isActive ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-bold text-xs" : "bg-slate-800 text-slate-400 border-slate-700 font-bold text-xs"}>
+                              {isActive ? "🟢 ACTIVE ON USER SCREENS" : "⚪ INACTIVE / HIDDEN"}
+                            </Badge>
+                            <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 font-bold text-xs">
+                              🏆 {q.points} PTS
+                            </Badge>
+                          </div>
+                          <h3 className="m-0 text-base sm:text-lg font-black text-white leading-snug">
+                            {q.question}
+                          </h3>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap shrink-0">
+                          <button
+                            onClick={() => handleToggleQuestionActive(q.id)}
+                            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-bold text-xs transition-colors text-center cursor-pointer min-h-[44px] ${
+                              isActive
+                                ? "bg-slate-900 border border-slate-800 hover:border-slate-700 text-rose-300"
+                                : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30"
+                            }`}
+                          >
+                            {isActive ? "🛑 Deactivate Q#" + q.id : "⚡ Activate Q#" + q.id}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* ANALYTICS SUMMARY BAR */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 p-3 rounded-xl bg-slate-900/90 border border-white/[0.06] text-xs">
+                        <div>
+                          <span className="text-slate-400 block font-semibold text-[10px] uppercase">Total Responses</span>
+                          <span className="text-white font-black text-sm">{totalResponses} users</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold text-[10px] uppercase">Correct Responses</span>
+                          <span className="text-emerald-400 font-black text-sm">{correctCount} ({accuracyPct}%)</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold text-[10px] uppercase">Unanswered</span>
+                          <span className="text-amber-400 font-black text-sm">{unansweredCount} users</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block font-semibold text-[10px] uppercase">Correct Option</span>
+                          <span className="text-purple-300 font-black text-sm">Option {String.fromCharCode(65 + q.correctAnswerIndex)}</span>
+                        </div>
+                      </div>
+
+                      {/* OPTION-WISE BREAKDOWN BARS */}
+                      <div className="space-y-3 pt-3 border-t border-white/[0.08]">
+                        {q.options.map((optText, optIdx) => {
+                          const votes = optionCounts[optIdx] || 0;
+                          const pct = totalResponses > 0 ? Math.round((votes / totalResponses) * 100) : 0;
+                          const isCorrect = optIdx === q.correctAnswerIndex;
+                          const currentGradient = BAR_GRADIENTS[optIdx % BAR_GRADIENTS.length];
+
+                          return (
+                            <div
+                              key={optIdx}
+                              className={`p-3 rounded-2xl border transition-colors ${
+                                isCorrect
+                                  ? "bg-emerald-950/20 border-emerald-500/40"
+                                  : "bg-slate-900/60 border-white/[0.06]"
+                              }`}
+                            >
+                              <div className="flex justify-between items-center text-xs font-bold mb-1.5 gap-2 flex-wrap">
+                                <span className="text-white flex items-center gap-2 min-w-0">
+                                  <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center text-[10px] text-purple-300 shrink-0">
+                                    {String.fromCharCode(65 + optIdx)}
+                                  </span>
+                                  {optText.endsWith(".png") || optText.endsWith(".jpg") ? (
+                                    <span className="text-purple-300 underline font-mono text-[11px]">
+                                      [Image Option {optIdx + 1}]
+                                    </span>
+                                  ) : (
+                                    <span className="truncate">{optText}</span>
+                                  )}
+                                  {isCorrect && (
+                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-extrabold text-[10px] px-2 py-0 shrink-0">
+                                      ✓ Correct Answer
+                                    </Badge>
+                                  )}
+                                </span>
+                                <span className="text-slate-300 text-xs font-semibold shrink-0">
+                                  {votes} votes ({pct}%)
+                                </span>
+                              </div>
+
+                              {/* GPU Accelerated scaleX Bar */}
+                              <div className="h-2.5 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06]">
+                                <div
+                                  className={`h-full bg-gradient-to-r ${currentGradient} rounded-full origin-left`}
+                                  style={{
+                                    transform: `scaleX(${pct / 100})`,
+                                    transition: "transform 700ms ease-out",
+                                    willChange: "transform",
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* PARTICIPANT OPTION PICK DETAILS (OPTIONAL EXPANDABLE VIEW) */}
+                      {totalResponses > 0 && (
+                        <div className="mt-4 pt-3 border-t border-white/[0.06]">
+                          <button
+                            onClick={() => toggleExpandDetails(q.id)}
+                            className="text-xs font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1.5 cursor-pointer bg-transparent border-0 p-0"
+                          >
+                            {isExpanded ? <EyeOff size={14} /> : <Eye size={14} />}
+                            <span>{isExpanded ? "Hide Participant Selection Details" : "View Participants Breakdown"}</span>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs space-y-2 max-h-60 overflow-y-auto">
+                              {responseEntries.map(([regNum, selectedOptIdx]) => {
+                                const name = participantMap[regNum.toUpperCase()] || regNum;
+                                const isAnsCorrect = selectedOptIdx === q.correctAnswerIndex;
+                                return (
+                                  <div
+                                    key={regNum}
+                                    className="flex items-center justify-between py-1 px-2 rounded bg-slate-950/50 border border-white/5"
+                                  >
+                                    <span className="font-bold text-white">
+                                      {name} <span className="text-slate-500 font-mono text-[10px]">({regNum})</span>
+                                    </span>
+                                    <span className={isAnsCorrect ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                                      Option {String.fromCharCode(65 + selectedOptIdx)} {isAnsCorrect ? "✓" : "✗"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -1354,32 +1437,49 @@ export default function AdminDashboardPage() {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Registered Participants</h1>
-                  <p className="text-slate-400 text-xs font-semibold mt-1">Manage event participant registrations, scores, and entries in Firestore.</p>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">
+                    Registered Participants ({filteredParticipants.length})
+                  </h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">
+                    Manage event participant registrations, scores, and entries in Firestore.
+                  </p>
                 </div>
                 <button
                   onClick={() => handleOpenParticipantModal()}
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-violet-600/30 flex items-center justify-center gap-2 self-start sm:self-auto"
+                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer min-h-[44px]"
                 >
                   ➕ Add New Participant
                 </button>
               </div>
 
+              {/* Search Bar */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search participants by name or reg number..."
+                  value={participantSearch}
+                  onChange={(e) => {
+                    setParticipantSearch(e.target.value);
+                    setVisibleParticipantCount(PAGE_SIZE);
+                  }}
+                  className="w-full px-4 py-3 pl-10 rounded-xl bg-slate-950/80 border border-slate-800 text-white text-xs font-semibold outline-none focus:border-violet-500 placeholder:text-slate-500 min-h-[44px]"
+                />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              </div>
+
               <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-4 sm:p-6 backdrop-blur-2xl shadow-xl">
-                {participantsList.length > 0 ? (
+                {visibleParticipants.length > 0 ? (
                   <div className="space-y-3">
-                    {participantsList.map((u) => {
+                    {visibleParticipants.map((u) => {
                       const pName = u.fullName || u.name || "Participant";
                       const pReg = u.registrationNumber || u.id;
                       return (
                         <div
                           key={u.id}
-                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all gap-3"
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-colors gap-3"
                         >
                           <div>
-                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">
-                              {pName}
-                            </h4>
+                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">{pName}</h4>
                             <span className="text-[11px] sm:text-xs font-mono text-violet-400 font-semibold block mt-0.5">
                               Reg #: {pReg}
                             </span>
@@ -1390,13 +1490,13 @@ export default function AdminDashboardPage() {
                             </Badge>
                             <button
                               onClick={() => handleOpenParticipantModal(u)}
-                              className="px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30 font-bold text-xs transition-all cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/30 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
                             >
                               ✏️ Edit
                             </button>
                             <button
                               onClick={() => handleDeleteParticipant(u.id, pName)}
-                              className="px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 font-bold text-xs transition-all cursor-pointer"
+                              className="px-3 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
                             >
                               🗑️ Delete
                             </button>
@@ -1406,12 +1506,24 @@ export default function AdminDashboardPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-slate-400 text-center py-6 text-xs sm:text-sm">No registered participants found in Firestore collection &apos;participants&apos;.</p>
+                  <p className="text-slate-400 text-center py-6 text-xs sm:text-sm">
+                    {participantSearch ? "No matching participants found." : "No registered participants found."}
+                  </p>
+                )}
+
+                {hasMoreParticipants && (
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={handleLoadMoreParticipants}
+                      className="px-6 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-violet-500/15 hover:border-violet-400/40 text-slate-300 hover:text-white font-bold text-xs transition-colors cursor-pointer min-h-[44px]"
+                    >
+                      Load 25 More ({filteredParticipants.length - visibleParticipantCount} remaining)
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
           )}
-
 
           {/* ADMINS TAB */}
           {activeTab === "admins" && (
@@ -1420,13 +1532,33 @@ export default function AdminDashboardPage() {
               <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>Authorized accounts with administrative access.</p>
 
               <div style={{ display: "grid", gap: "16px" }}>
-                <div style={{ padding: "20px", background: "rgba(124, 58, 237, 0.1)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  style={{
+                    padding: "20px",
+                    background: "rgba(124, 58, 237, 0.1)",
+                    border: "1px solid rgba(124, 58, 237, 0.3)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <div>
                     <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Jaiyansh</h4>
                   </div>
                   <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
                 </div>
-                <div style={{ padding: "20px", background: "rgba(124, 58, 237, 0.1)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div
+                  style={{
+                    padding: "20px",
+                    background: "rgba(124, 58, 237, 0.1)",
+                    border: "1px solid rgba(124, 58, 237, 0.3)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <div>
                     <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Abhinav</h4>
                   </div>
@@ -1440,9 +1572,19 @@ export default function AdminDashboardPage() {
           {activeTab === "tools" && (
             <div>
               <h1 style={{ fontSize: "1.8rem", fontWeight: 800, marginBottom: "8px" }}>Database Operations</h1>
-              <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>Manage Firestore database initialization & data seeding.</p>
+              <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>
+                Manage Firestore database initialization & data seeding.
+              </p>
 
-              <div style={{ background: "rgba(17, 20, 32, 0.7)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "16px", padding: "32px", maxWidth: "500px" }}>
+              <div
+                style={{
+                  background: "rgba(17, 20, 32, 0.7)",
+                  border: "1px solid rgba(124, 58, 237, 0.3)",
+                  borderRadius: "16px",
+                  padding: "32px",
+                  maxWidth: "500px",
+                }}
+              >
                 <h3 style={{ margin: "0 0 12px", fontSize: "1.2rem", fontWeight: 700 }}>Seed Firestore Collections</h3>
                 <p style={{ fontSize: "0.88rem", color: "#cbd5e1", lineHeight: 1.6, marginBottom: "24px" }}>
                   Runs initial seed operations to populate default events, user collections, leaderboard records, and administrator documents.
@@ -1502,11 +1644,11 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setPollQuestion(e.target.value)}
                   style={{
                     width: "100%",
-                    padding: "12px 14px",
+                    padding: "12px 16px",
                     background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
+                    color: "white",
                     fontSize: "0.95rem",
                     outline: "none",
                   }}
@@ -1515,458 +1657,101 @@ export default function AdminDashboardPage() {
 
               <div>
                 <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                  Poll Status
+                  Options
                 </label>
-                <select
-                  value={pollStatus}
-                  onChange={(e) => setPollStatus(e.target.value as any)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    background: "#161b2c",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
-                    borderRadius: "10px",
-                    color: "#fff",
-                    fontSize: "0.9rem",
-                    outline: "none",
-                  }}
-                >
-                  <option value="active">Active (Accepting Votes)</option>
-                  <option value="closed">Closed (View Only)</option>
-                </select>
-              </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                  <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1" }}>
-                    Options / Choices
-                  </label>
+                {pollOptions.map((opt, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                    <input
+                      type="text"
+                      placeholder={`Option ${idx + 1}`}
+                      value={opt}
+                      onChange={(e) => {
+                        const newOpts = [...pollOptions];
+                        newOpts[idx] = e.target.value;
+                        setPollOptions(newOpts);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: "10px 14px",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        borderRadius: "10px",
+                        color: "white",
+                        fontSize: "0.9rem",
+                        outline: "none",
+                      }}
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
+                        style={{
+                          padding: "0 12px",
+                          background: "rgba(239, 68, 68, 0.2)",
+                          border: "1px solid rgba(239, 68, 68, 0.4)",
+                          borderRadius: "10px",
+                          color: "#fca5a5",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 6 && (
                   <button
-                    type="button"
                     onClick={() => setPollOptions([...pollOptions, ""])}
                     style={{
+                      marginTop: "4px",
+                      padding: "8px 16px",
                       background: "rgba(124, 58, 237, 0.2)",
-                      border: "none",
+                      border: "1px solid rgba(124, 58, 237, 0.4)",
+                      borderRadius: "10px",
                       color: "#c4b5fd",
-                      padding: "4px 10px",
-                      borderRadius: "6px",
-                      fontSize: "0.78rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    + Add Choice
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "200px", overflowY: "auto" }}>
-                  {pollOptions.map((opt, idx) => (
-                    <div key={idx} style={{ display: "flex", gap: "8px" }}>
-                      <input
-                        type="text"
-                        placeholder={`Option ${idx + 1}`}
-                        value={opt}
-                        onChange={(e) => {
-                          const updated = [...pollOptions];
-                          updated[idx] = e.target.value;
-                          setPollOptions(updated);
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: "10px 12px",
-                          background: "rgba(255, 255, 255, 0.05)",
-                          border: "1px solid rgba(148, 163, 184, 0.2)",
-                          borderRadius: "8px",
-                          color: "#fff",
-                          fontSize: "0.9rem",
-                          outline: "none",
-                        }}
-                      />
-                      {pollOptions.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))}
-                          style={{
-                            background: "rgba(239, 68, 68, 0.15)",
-                            border: "1px solid rgba(239, 68, 68, 0.3)",
-                            color: "#fca5a5",
-                            borderRadius: "8px",
-                            padding: "0 12px",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
-              <button
-                type="button"
-                onClick={() => setPollModalOpen(false)}
-                style={{
-                  padding: "10px 18px",
-                  background: "transparent",
-                  border: "1px solid rgba(148, 163, 184, 0.2)",
-                  color: "#94a3b8",
-                  borderRadius: "10px",
-                  fontWeight: 600,
-                  fontSize: "0.9rem",
-                  cursor: "pointer",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSavePoll}
-                disabled={isSavingPoll}
-                style={{
-                  padding: "10px 22px",
-                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
-                  border: "none",
-                  color: "#fff",
-                  borderRadius: "10px",
-                  fontWeight: 700,
-                  fontSize: "0.9rem",
-                  cursor: "pointer",
-                  opacity: isSavingPoll ? 0.6 : 1,
-                  boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
-                }}
-              >
-                {isSavingPoll ? "Saving..." : editingPollId ? "Update Poll" : "Create Poll"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CREATE / EDIT QUIZ MODAL */}
-      {quizModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0, 0, 0, 0.8)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 100,
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#0d111d",
-              border: "1px solid rgba(236, 72, 153, 0.4)",
-              borderRadius: "20px",
-              padding: "32px",
-              width: "100%",
-              maxWidth: "680px",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.8)",
-            }}
-          >
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "0 0 6px", color: "#f8fafc" }}>
-              {editingQuizId ? "✏️ Edit Quiz" : "➕ Create New Gaming Quiz"}
-            </h2>
-            <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 24px" }}>
-              Define quiz title, time limit, and multiple-choice questions with answer key.
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                  Quiz Title
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Ultimate Valorant & VR Trivia Challenge"
-                  value={quizTitle}
-                  onChange={(e) => setQuizTitle(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px 14px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
-                    borderRadius: "10px",
-                    color: "#fff",
-                    fontSize: "0.95rem",
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                    Status
-                  </label>
-                  <select
-                    value={quizStatus}
-                    onChange={(e) => setQuizStatus(e.target.value as any)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      background: "#161b2c",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "10px",
-                      color: "#fff",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  >
-                    <option value="active">Active (Playable)</option>
-                    <option value="closed">Closed (Disabled)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                    Time Limit (Minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={quizTimeLimit}
-                    onChange={(e) => setQuizTimeLimit(Number(e.target.value))}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      background: "rgba(255, 255, 255, 0.05)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "10px",
-                      color: "#fff",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                  Description (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Short description or guidelines for participants..."
-                  value={quizDescription}
-                  onChange={(e) => setQuizDescription(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
-                    borderRadius: "10px",
-                    color: "#fff",
-                    fontSize: "0.9rem",
-                    outline: "none",
-                    resize: "none",
-                  }}
-                />
-              </div>
-
-              {/* Questions Builder */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingTop: "12px", borderTop: "1px solid rgba(255, 255, 255, 0.1)" }}>
-                  <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "#f472b6" }}>
-                    Quiz Questions ({quizQuestions.length})
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setQuizQuestions([
-                        ...quizQuestions,
-                        { id: `q_${Date.now()}`, question: "", options: ["", "", "", ""], correctAnswerIndex: 0, points: 10 },
-                      ])
-                    }
-                    style={{
-                      background: "rgba(236, 72, 153, 0.2)",
-                      border: "1px solid rgba(236, 72, 153, 0.4)",
-                      color: "#f472b6",
-                      padding: "6px 14px",
-                      borderRadius: "8px",
-                      fontSize: "0.8rem",
+                      fontSize: "0.82rem",
                       fontWeight: 700,
                       cursor: "pointer",
                     }}
                   >
-                    + Add Question
+                    + Add Option
                   </button>
-                </div>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-                  {quizQuestions.map((q, qIdx) => (
-                    <div
-                      key={q.id || qIdx}
-                      style={{
-                        background: "rgba(255, 255, 255, 0.03)",
-                        border: "1px solid rgba(255, 255, 255, 0.08)",
-                        borderRadius: "12px",
-                        padding: "18px",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "#a78bfa" }}>
-                          Question #{qIdx + 1}
-                        </span>
-                        {quizQuestions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setQuizQuestions(quizQuestions.filter((_, i) => i !== qIdx))}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "#fca5a5",
-                              fontSize: "0.8rem",
-                              cursor: "pointer",
-                              fontWeight: 600,
-                            }}
-                          >
-                            🗑️ Remove Question
-                          </button>
-                        )}
-                      </div>
-
-                      <input
-                        type="text"
-                        placeholder="Question Prompt / Title..."
-                        value={q.question}
-                        onChange={(e) => {
-                          const updated = [...quizQuestions];
-                          updated[qIdx].question = e.target.value;
-                          setQuizQuestions(updated);
-                        }}
-                        style={{
-                          width: "100%",
-                          padding: "10px 12px",
-                          background: "rgba(255, 255, 255, 0.05)",
-                          border: "1px solid rgba(148, 163, 184, 0.2)",
-                          borderRadius: "8px",
-                          color: "#fff",
-                          fontSize: "0.9rem",
-                          outline: "none",
-                          marginBottom: "12px",
-                        }}
-                      />
-
-                      {/* Options */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
-                        {q.options.map((opt, oIdx) => (
-                          <div key={oIdx} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <input
-                              type="radio"
-                              name={`correct_${qIdx}`}
-                              checked={q.correctAnswerIndex === oIdx}
-                              onChange={() => {
-                                const updated = [...quizQuestions];
-                                updated[qIdx].correctAnswerIndex = oIdx;
-                                setQuizQuestions(updated);
-                              }}
-                            />
-                            <input
-                              type="text"
-                              placeholder={`Option ${oIdx + 1}`}
-                              value={opt}
-                              onChange={(e) => {
-                                const updated = [...quizQuestions];
-                                updated[qIdx].options[oIdx] = e.target.value;
-                                setQuizQuestions(updated);
-                              }}
-                              style={{
-                                flex: 1,
-                                padding: "8px 10px",
-                                background: "rgba(255, 255, 255, 0.04)",
-                                border: q.correctAnswerIndex === oIdx ? "1px solid #4ade80" : "1px solid rgba(148, 163, 184, 0.15)",
-                                borderRadius: "6px",
-                                color: "#fff",
-                                fontSize: "0.85rem",
-                                outline: "none",
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.78rem", color: "#94a3b8" }}>
-                        <span>Radio dot indicates the correct answer.</span>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span>Points:</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={q.points}
-                            onChange={(e) => {
-                              const updated = [...quizQuestions];
-                              updated[qIdx].points = Number(e.target.value);
-                              setQuizQuestions(updated);
-                            }}
-                            style={{
-                              width: "60px",
-                              padding: "4px 8px",
-                              background: "rgba(255, 255, 255, 0.05)",
-                              border: "1px solid rgba(148, 163, 184, 0.2)",
-                              borderRadius: "6px",
-                              color: "#fff",
-                              fontSize: "0.8rem",
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                )}
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
+            <div style={{ display: "flex", gap: "12px", marginTop: "28px", justifyContent: "flex-end" }}>
               <button
-                type="button"
-                onClick={() => setQuizModalOpen(false)}
+                onClick={() => setPollModalOpen(false)}
                 style={{
-                  padding: "10px 18px",
+                  padding: "10px 20px",
                   background: "transparent",
-                  border: "1px solid rgba(148, 163, 184, 0.2)",
-                  color: "#94a3b8",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "10px",
+                  color: "#cbd5e1",
+                  fontSize: "0.88rem",
                   fontWeight: 600,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
                 }}
               >
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleSaveQuiz}
-                disabled={isSavingQuiz}
+                onClick={handleSavePoll}
+                disabled={isSavingPoll}
                 style={{
-                  padding: "10px 22px",
-                  background: "linear-gradient(135deg, #ec4899, #be185d)",
+                  padding: "10px 24px",
+                  background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
                   border: "none",
-                  color: "#fff",
                   borderRadius: "10px",
+                  color: "white",
+                  fontSize: "0.88rem",
                   fontWeight: 700,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
-                  opacity: isSavingQuiz ? 0.6 : 1,
-                  boxShadow: "0 0 15px rgba(236, 72, 153, 0.4)",
+                  opacity: isSavingPoll ? 0.6 : 1,
                 }}
               >
-                {isSavingQuiz ? "Saving..." : editingQuizId ? "Update Quiz" : "Create Quiz"}
+                {isSavingPoll ? "Saving..." : editingPollId ? "Save Changes" : "Create Poll"}
               </button>
             </div>
           </div>
@@ -1982,7 +1767,7 @@ export default function AdminDashboardPage() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0, 0, 0, 0.8)",
+            background: "rgba(0, 0, 0, 0.75)",
             backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
@@ -1998,7 +1783,7 @@ export default function AdminDashboardPage() {
               borderRadius: "20px",
               padding: "32px",
               width: "100%",
-              maxWidth: "560px",
+              maxWidth: "540px",
               boxShadow: "0 20px 50px rgba(0, 0, 0, 0.8)",
             }}
           >
@@ -2006,7 +1791,7 @@ export default function AdminDashboardPage() {
               {editingEventId ? "✏️ Edit Event" : "➕ Create New Event"}
             </h2>
             <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 24px" }}>
-              Configure event details, category, date, venue, and status for IceBreaking fest.
+              Define title, category, location, and scheduling details for icebreaking activities.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -2016,47 +1801,43 @@ export default function AdminDashboardPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Beat Saber VR Championship"
+                  placeholder="e.g. Speed Networking Arena"
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
                   style={{
                     width: "100%",
-                    padding: "12px 14px",
+                    padding: "12px 16px",
                     background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
+                    color: "white",
                     fontSize: "0.95rem",
                     outline: "none",
                   }}
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
                     Category
                   </label>
-                  <select
+                  <input
+                    type="text"
+                    placeholder="e.g. Gaming / Icebreaker"
                     value={eventCategory}
                     onChange={(e) => setEventCategory(e.target.value)}
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      background: "#161b2c",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
                       borderRadius: "10px",
-                      color: "#fff",
+                      color: "white",
                       fontSize: "0.9rem",
                       outline: "none",
                     }}
-                  >
-                    <option value="Icebreaker Games">Icebreaker Games</option>
-                    <option value="VR Arena">VR Arena</option>
-                    <option value="PC Gaming">PC Gaming</option>
-                    <option value="Console Gaming">Console Gaming</option>
-                    <option value="Trivia & Quiz">Trivia & Quiz</option>
-                  </select>
+                  />
                 </div>
 
                 <div>
@@ -2070,63 +1851,17 @@ export default function AdminDashboardPage() {
                       width: "100%",
                       padding: "10px 14px",
                       background: "#161b2c",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
                       borderRadius: "10px",
-                      color: "#fff",
+                      color: "white",
                       fontSize: "0.9rem",
                       outline: "none",
                     }}
                   >
-                    <option value="live">Live Now</option>
-                    <option value="upcoming">Upcoming</option>
-                    <option value="completed">Completed</option>
+                    <option value="live">🟢 Live / Active</option>
+                    <option value="upcoming">⏳ Upcoming</option>
+                    <option value="completed">🏁 Completed</option>
                   </select>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                    Date & Time
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. aug 6, 2:30 pm"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      background: "rgba(255, 255, 255, 0.05)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "10px",
-                      color: "#fff",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                    Venue / Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Auditorium Hall"
-                    value={eventVenue}
-                    onChange={(e) => setEventVenue(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      background: "rgba(255, 255, 255, 0.05)",
-                      border: "1px solid rgba(148, 163, 184, 0.2)",
-                      borderRadius: "10px",
-                      color: "#fff",
-                      fontSize: "0.9rem",
-                      outline: "none",
-                    }}
-                  />
                 </div>
               </div>
 
@@ -2135,120 +1870,163 @@ export default function AdminDashboardPage() {
                   Description
                 </label>
                 <textarea
-                  rows={3}
-                  placeholder="Overview of rules and guidelines..."
+                  placeholder="Describe the activity flow..."
                   value={eventDescription}
                   onChange={(e) => setEventDescription(e.target.value)}
+                  rows={3}
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
+                    padding: "12px 16px",
                     background: "rgba(255, 255, 255, 0.05)",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
+                    color: "white",
                     fontSize: "0.9rem",
                     outline: "none",
-                    resize: "none",
+                    resize: "vertical",
                   }}
                 />
               </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
+                    Venue / Room
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lab 204"
+                    value={eventVenue}
+                    onChange={(e) => setEventVenue(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      borderRadius: "10px",
+                      color: "white",
+                      fontSize: "0.9rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
+                    Scheduled Time
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2:00 PM - 3:30 PM"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      border: "1px solid rgba(255, 255, 255, 0.15)",
+                      borderRadius: "10px",
+                      color: "white",
+                      fontSize: "0.9rem",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
+            <div style={{ display: "flex", gap: "12px", marginTop: "28px", justifyContent: "flex-end" }}>
               <button
-                type="button"
                 onClick={() => setEventModalOpen(false)}
                 style={{
-                  padding: "10px 18px",
+                  padding: "10px 20px",
                   background: "transparent",
-                  border: "1px solid rgba(148, 163, 184, 0.2)",
-                  color: "#94a3b8",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "10px",
+                  color: "#cbd5e1",
+                  fontSize: "0.88rem",
                   fontWeight: 600,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
                 }}
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleSaveEvent}
                 disabled={isSavingEvent}
                 style={{
-                  padding: "10px 22px",
-                  background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                  padding: "10px 24px",
+                  background: "linear-gradient(135deg, #2563eb, #4f46e5)",
                   border: "none",
-                  color: "#fff",
                   borderRadius: "10px",
+                  color: "white",
+                  fontSize: "0.88rem",
                   fontWeight: 700,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
                   opacity: isSavingEvent ? 0.6 : 1,
-                  boxShadow: "0 0 15px rgba(59, 130, 246, 0.4)",
                 }}
               >
-                {isSavingEvent ? "Saving..." : editingEventId ? "Update Event" : "Create Event"}
+                {isSavingEvent ? "Saving..." : editingEventId ? "Save Changes" : "Create Event"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* PARTICIPANT EDIT / ADD MODAL */}
+      {/* EDIT PARTICIPANT MODAL */}
       {participantModalOpen && (
         <div
           style={{
             position: "fixed",
-            inset: 0,
-            zIndex: 100,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(8px)",
+            backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            zIndex: 100,
             padding: "20px",
           }}
         >
           <div
             style={{
+              background: "#0d111d",
+              border: "1px solid rgba(124, 58, 237, 0.4)",
+              borderRadius: "20px",
+              padding: "32px",
               width: "100%",
               maxWidth: "500px",
-              background: "#0d111d",
-              border: "1px solid rgba(124, 58, 237, 0.35)",
-              borderRadius: "20px",
-              padding: "28px",
-              boxShadow: "0 0 40px rgba(124, 58, 237, 0.25)",
+              boxShadow: "0 20px 50px rgba(0, 0, 0, 0.8)",
             }}
           >
-            <h2 style={{ margin: "0 0 6px", fontSize: "1.3rem", fontWeight: 800, color: "#f8fafc" }}>
-              {editingParticipantId ? "✏️ Edit Participant Details" : "➕ Add New Participant"}
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 800, margin: "0 0 6px", color: "#f8fafc" }}>
+              {editingParticipantId ? "✏️ Edit Participant" : "➕ Add Participant"}
             </h2>
             <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: "0 0 24px" }}>
-              {editingParticipantId
-                ? "Update registration number, full name, or points for this participant."
-                : "Manually add a participant registration record to Firestore."}
+              Update registration details or adjust points directly in Firestore.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "6px" }}>
-                  Registration Number (e.g. 25BCY10001)
+                  Registration Number
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. 25BCY10001"
                   value={editParticipantReg}
                   onChange={(e) => setEditParticipantReg(e.target.value.toUpperCase())}
-                  placeholder="25BCY10001"
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
-                    background: "#161b2c",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    padding: "12px 16px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
+                    color: "white",
                     fontSize: "0.95rem",
-                    fontWeight: 700,
                     outline: "none",
                   }}
                 />
@@ -2260,17 +2038,17 @@ export default function AdminDashboardPage() {
                 </label>
                 <input
                   type="text"
+                  placeholder="e.g. Alex Mercer"
                   value={editParticipantName}
                   onChange={(e) => setEditParticipantName(e.target.value)}
-                  placeholder="John Doe"
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
-                    background: "#161b2c",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    padding: "12px 16px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
-                    fontSize: "0.9rem",
+                    color: "white",
+                    fontSize: "0.95rem",
                     outline: "none",
                   }}
                 />
@@ -2282,76 +2060,70 @@ export default function AdminDashboardPage() {
                 </label>
                 <input
                   type="number"
+                  placeholder="0"
                   value={editParticipantScore}
                   onChange={(e) => setEditParticipantScore(Number(e.target.value))}
-                  placeholder="0"
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
-                    background: "#161b2c",
-                    border: "1px solid rgba(148, 163, 184, 0.2)",
+                    padding: "12px 16px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "10px",
-                    color: "#fff",
-                    fontSize: "0.9rem",
+                    color: "white",
+                    fontSize: "0.95rem",
                     outline: "none",
                   }}
                 />
               </div>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
+            <div style={{ display: "flex", gap: "12px", marginTop: "28px", justifyContent: "flex-end" }}>
               <button
-                type="button"
                 onClick={() => setParticipantModalOpen(false)}
                 style={{
-                  padding: "10px 18px",
+                  padding: "10px 20px",
                   background: "transparent",
-                  border: "1px solid rgba(148, 163, 184, 0.2)",
-                  color: "#94a3b8",
+                  border: "1px solid rgba(255, 255, 255, 0.2)",
                   borderRadius: "10px",
+                  color: "#cbd5e1",
+                  fontSize: "0.88rem",
                   fontWeight: 600,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
                 }}
               >
                 Cancel
               </button>
               <button
-                type="button"
                 onClick={handleSaveParticipant}
                 disabled={isSavingParticipant}
                 style={{
-                  padding: "10px 22px",
-                  background: "linear-gradient(135deg, #7c3aed, #3b82f6)",
+                  padding: "10px 24px",
+                  background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
                   border: "none",
-                  color: "#fff",
                   borderRadius: "10px",
+                  color: "white",
+                  fontSize: "0.88rem",
                   fontWeight: 700,
-                  fontSize: "0.9rem",
                   cursor: "pointer",
                   opacity: isSavingParticipant ? 0.6 : 1,
-                  boxShadow: "0 0 15px rgba(124, 58, 237, 0.4)",
                 }}
               >
-                {isSavingParticipant ? "Saving..." : editingParticipantId ? "Update Entry" : "Save Participant"}
+                {isSavingParticipant ? "Saving..." : editingParticipantId ? "Save Changes" : "Add Participant"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* HEROUI ALERT DIALOG FOR IRREVERSIBLE ADMIN ACTIONS */}
+      {/* CONFIRMATION MODAL */}
       <AdminConfirmModal
         isOpen={confirmModal.isOpen}
-        onOpenChange={(open) => setConfirmModal((prev) => ({ ...prev, isOpen: open }))}
         title={confirmModal.title}
         description={confirmModal.description}
         confirmLabel={confirmModal.confirmLabel}
+        onOpenChange={(open) => setConfirmModal((prev) => ({ ...prev, isOpen: open }))}
         onConfirm={confirmModal.onConfirm}
       />
     </div>
   );
 }
-
-
-

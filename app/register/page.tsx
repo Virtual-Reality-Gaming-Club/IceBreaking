@@ -1,12 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
-import { RegistrationForm } from "@/components/registration/RegistrationForm";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
+
+const RegistrationForm = dynamic(
+  () => import("@/components/registration/RegistrationForm").then((mod) => mod.RegistrationForm),
+  {
+    loading: () => (
+      <div className="w-full max-w-[448px] mx-auto p-8 rounded-3xl bg-[#0a0d18]/90 border border-violet-500/30 text-center backdrop-blur-2xl">
+        <Sparkles className="mx-auto text-violet-400 mb-3 animate-spin" size={28} />
+        <p className="text-slate-400 text-xs font-bold">Loading Registration Form...</p>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 export default function RegisterPage() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(true);
