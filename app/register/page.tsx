@@ -1,11 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { PublicNavbar } from "@/components/layout/PublicNavbar";
 import { PublicFooter } from "@/components/layout/PublicFooter";
 import { RegistrationForm } from "@/components/registration/RegistrationForm";
+import { db } from "@/lib/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import Link from "next/link";
 
 export default function RegisterPage() {
-  const isRegistrationOpen = true;
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "registration"), (docSnap) => {
+      if (docSnap.exists()) {
+        setIsRegistrationOpen(Boolean(docSnap.data()?.isOpen));
+      } else {
+        setIsRegistrationOpen(true);
+      }
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -21,10 +39,55 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {isRegistrationOpen && (
-          <div className="animate-fade-in-up" style={{ width: "100%", animationDelay: "100ms" }}>
-            <RegistrationForm />
-          </div>
+        {!loading && (
+          <>
+            {isRegistrationOpen ? (
+              <div className="animate-fade-in-up" style={{ width: "100%", animationDelay: "100ms" }}>
+                <RegistrationForm />
+              </div>
+            ) : (
+              <div
+                className="animate-fade-in-up"
+                style={{
+                  maxWidth: "520px",
+                  width: "100%",
+                  padding: "48px 32px",
+                  background: "rgba(10, 13, 24, 0.92)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  border: "1px dashed rgba(239, 68, 68, 0.4)",
+                  borderRadius: "24px",
+                  textAlign: "center",
+                  boxShadow: "0 20px 45px rgba(0, 0, 0, 0.7), 0 0 30px rgba(239, 68, 68, 0.15)",
+                }}
+              >
+                <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🔒</div>
+                <h2 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#fca5a5", marginBottom: "12px" }}>
+                  Registration Currently Closed
+                </h2>
+                <p style={{ color: "#cbd5e1", fontSize: "0.98rem", lineHeight: 1.6, marginBottom: "28px" }}>
+                  The event admin has temporarily paused new participant registrations. If you are already registered, you can proceed directly to the Event Activity Hub!
+                </p>
+                <Link href="/event" style={{ textDecoration: "none" }}>
+                  <button
+                    style={{
+                      padding: "14px 28px",
+                      background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)",
+                      border: "none",
+                      borderRadius: "12px",
+                      color: "#ffffff",
+                      fontSize: "0.95rem",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 20px rgba(124, 58, 237, 0.4)",
+                    }}
+                  >
+                    🎮 Go to Event Hub →
+                  </button>
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </main>
 

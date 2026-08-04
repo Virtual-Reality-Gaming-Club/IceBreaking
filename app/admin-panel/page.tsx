@@ -51,6 +51,9 @@ export default function AdminDashboardPage() {
   const [eventsList, setEventsList] = useState<EventItem[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools">("overview");
 
+  // Global Registration Toggle State
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+
   // Poll Form State
   const [pollModalOpen, setPollModalOpen] = useState(false);
   const [editingPollId, setEditingPollId] = useState<string | null>(null);
@@ -139,9 +142,10 @@ export default function AdminDashboardPage() {
       // 4. Fetch Leaderboard / Teams count
       const leaderboardSnap = await getDocs(collection(db, "leaderboard"));
 
-      // 5. Fetch Polls & Quizzes
+      // 5. Fetch Polls & Quizzes & Registration Status
       fetchPolls();
       fetchQuizzes();
+      fetchRegistrationStatus();
 
       const eventsSnap = await getDocs(collection(db, "events"));
 
@@ -155,6 +159,36 @@ export default function AdminDashboardPage() {
       console.error("Error fetching dashboard data:", err);
     }
   };
+
+  const fetchRegistrationStatus = async () => {
+    try {
+      const { doc, getDoc } = await import("firebase/firestore");
+      const configSnap = await getDoc(doc(db, "settings", "registration"));
+      if (configSnap.exists()) {
+        setRegistrationOpen(Boolean(configSnap.data()?.isOpen));
+      } else {
+        setRegistrationOpen(true);
+      }
+    } catch (err) {
+      console.error("Error fetching registration status:", err);
+    }
+  };
+
+  const handleToggleRegistration = async () => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      const nextState = !registrationOpen;
+      await setDoc(doc(db, "settings", "registration"), {
+        isOpen: nextState,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setRegistrationOpen(nextState);
+    } catch (err) {
+      console.error("Error toggling registration status:", err);
+      alert("Failed to update registration status.");
+    }
+  };
+
 
 
   const fetchEvents = async () => {
@@ -791,6 +825,65 @@ export default function AdminDashboardPage() {
               <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>
                 Real-time operational summary of the IceBreaking event platform.
               </p>
+
+              {/* Event Registration Status Control Banner */}
+              <div
+                style={{
+                  marginBottom: "32px",
+                  padding: "24px 28px",
+                  background: registrationOpen ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                  border: registrationOpen ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid rgba(239, 68, 68, 0.3)",
+                  borderRadius: "16px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "16px",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "1rem", fontWeight: 800, color: "#f8fafc" }}>
+                      📝 Event Registration Status:
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        padding: "3px 10px",
+                        borderRadius: "20px",
+                        fontWeight: 700,
+                        background: registrationOpen ? "rgba(34, 197, 94, 0.2)" : "rgba(239, 68, 68, 0.2)",
+                        color: registrationOpen ? "#4ade80" : "#fca5a5",
+                        border: registrationOpen ? "1px solid rgba(34, 197, 94, 0.4)" : "1px solid rgba(239, 68, 68, 0.4)",
+                      }}
+                    >
+                      {registrationOpen ? "🟢 OPEN (Public Can Register)" : "🔒 CLOSED (Registration Locked)"}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, color: "#cbd5e1", fontSize: "0.88rem" }}>
+                    {registrationOpen
+                      ? "Users on the home page can click 'Register Now' to submit their details."
+                      : "The home page will display '🔒 Registration is currently closed.'"}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleToggleRegistration}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "10px",
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: "0.9rem",
+                    cursor: "pointer",
+                    background: registrationOpen ? "linear-gradient(135deg, #ef4444, #dc2626)" : "linear-gradient(135deg, #22c55e, #16a34a)",
+                    color: "#ffffff",
+                    boxShadow: registrationOpen ? "0 0 15px rgba(239, 68, 68, 0.4)" : "0 0 15px rgba(34, 197, 94, 0.4)",
+                  }}
+                >
+                  {registrationOpen ? "🔒 Close Registration" : "🟢 Open Registration"}
+                </button>
+              </div>
 
               {/* Metrics Grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "40px" }}>
