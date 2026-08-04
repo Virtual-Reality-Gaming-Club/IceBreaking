@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
-import { getAllAdmins, AdminUser } from "@/lib/adminAuth";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 
 interface EventItem {
   id: string;
@@ -26,6 +27,8 @@ interface ParticipantItem {
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Dashboard Stats & Data
@@ -41,9 +44,31 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<"overview" | "events" | "users" | "admins" | "tools">("overview");
 
   useEffect(() => {
-    fetchDashboardData();
-    setLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) {
+        setIsAdmin(false);
+        setLoading(false);
+        router.push("/admin-panel/login");
+        return;
+      }
+
+      setUser(currentUser);
+      const authorized = await checkIsAdmin(currentUser.email, currentUser.uid);
+      setIsAdmin(authorized);
+
+      if (!authorized) {
+        setLoading(false);
+        router.push("/admin-panel/login");
+        return;
+      }
+
+      // Load Dashboard Data for verified admin
+      fetchDashboardData();
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const fetchDashboardData = async () => {
     try {
@@ -81,7 +106,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  if (loading) {
+  if (loading || !user || !isAdmin) {
     return (
       <div
         style={{
@@ -95,7 +120,7 @@ export default function AdminDashboardPage() {
           fontWeight: 600,
         }}
       >
-        ⚡ Loading VRGC Admin Dashboard...
+        🔒 Verifying Admin Authorization...
       </div>
     );
   }
@@ -145,11 +170,76 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#f1f5f9" }}>Administrator Access</p>
-            <span style={{ fontSize: "0.72rem", color: "#22c55e", fontWeight: 700 }}>● Open Access (No Auth)</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          {/* User Profile Avatar & Info */}
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={user.displayName || "Admin Avatar"}
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  border: "2px solid rgba(124, 58, 237, 0.5)",
+                  objectFit: "cover",
+                  boxShadow: "0 0 10px rgba(124, 58, 237, 0.3)",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7c3aed, #4c1d95)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: "1.1rem",
+                  color: "#ffffff",
+                  border: "2px solid rgba(124, 58, 237, 0.5)",
+                }}
+              >
+                {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            <div style={{ textAlign: "left" }}>
+              <p style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#f8fafc", lineHeight: 1.2 }}>
+                {user?.displayName
+                  ? user.displayName.replace(/\b[0-9]{2}[A-Za-z]{3}[0-9]{5}\b/gi, "").trim()
+                  : "Admin User"}
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                <span style={{ fontSize: "0.72rem", background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", border: "1px solid rgba(34, 197, 94, 0.3)", padding: "1px 8px", borderRadius: "4px", fontWeight: 700 }}>
+                  👑 Superadmin
+                </span>
+              </div>
+            </div>
           </div>
+
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              router.push("/admin-panel/login");
+            }}
+            style={{
+              padding: "8px 16px",
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              background: "rgba(239, 68, 68, 0.15)",
+              color: "#fca5a5",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              borderRadius: "8px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              marginLeft: "8px",
+            }}
+          >
+            🚪 Sign Out
+          </button>
         </div>
       </header>
 
@@ -243,13 +333,13 @@ export default function AdminDashboardPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "rgba(124, 58, 237, 0.1)", borderRadius: "10px", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
                     <div>
-                      <strong>Jaiyansh</strong> (<code>jaiyansh.25bcy10268@vitbhopal.ac.in</code>)
+                      <strong>Jaiyansh</strong>
                     </div>
                     <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", background: "rgba(124, 58, 237, 0.1)", borderRadius: "10px", border: "1px solid rgba(124, 58, 237, 0.2)" }}>
                     <div>
-                      <strong>Abhinav</strong> (<code>abhinav.25bcy10254@vitbhopal.ac.in</code>)
+                      <strong>Abhinav</strong>
                     </div>
                     <span style={{ color: "#34d399", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
                   </div>
@@ -295,8 +385,7 @@ export default function AdminDashboardPage() {
                   recentUsers.map((u) => (
                     <div key={u.id} style={{ display: "flex", justifyContent: "space-between", padding: "14px", borderBottom: "1px solid rgba(148, 163, 184, 0.1)" }}>
                       <div>
-                        <strong>{u.name || u.id}</strong>
-                        <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>{u.email}</div>
+                        <strong>{u.name || "Participant"}</strong>
                       </div>
                       <span style={{ color: "#a78bfa", fontWeight: 600, fontSize: "0.85rem" }}>Role: {u.role}</span>
                     </div>
@@ -317,15 +406,13 @@ export default function AdminDashboardPage() {
               <div style={{ display: "grid", gap: "16px" }}>
                 <div style={{ padding: "20px", background: "rgba(124, 58, 237, 0.1)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <h4 style={{ margin: "0 0 4px", fontSize: "1rem" }}>Jaiyansh</h4>
-                    <code style={{ fontSize: "0.85rem", color: "#c4b5fd" }}>jaiyansh.25bcy10268@vitbhopal.ac.in</code>
+                    <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Jaiyansh</h4>
                   </div>
                   <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
                 </div>
                 <div style={{ padding: "20px", background: "rgba(124, 58, 237, 0.1)", border: "1px solid rgba(124, 58, 237, 0.3)", borderRadius: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
-                    <h4 style={{ margin: "0 0 4px", fontSize: "1rem" }}>Abhinav</h4>
-                    <code style={{ fontSize: "0.85rem", color: "#c4b5fd" }}>abhinav.25bcy10254@vitbhopal.ac.in</code>
+                    <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Abhinav</h4>
                   </div>
                   <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
                 </div>

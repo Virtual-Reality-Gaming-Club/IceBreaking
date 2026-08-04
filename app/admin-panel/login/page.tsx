@@ -8,7 +8,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut as firebaseSignOut, User } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut as firebaseSignOut, User } from "firebase/auth";
 import { checkIsAdmin } from "@/lib/adminAuth";
 import { SeedDatabaseButton } from "@/components/SeedDatabaseButton";
 
@@ -19,9 +19,25 @@ export default function AdminLoginPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle redirect result if user comes back from Google Auth redirect
+  // Check if user is already signed in on mount; if authorized admin, redirect to /admin-panel
   useEffect(() => {
-    router.replace("/admin-panel");
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        const adminStatus = await checkIsAdmin(currentUser.email, currentUser.uid);
+        setIsAdmin(adminStatus);
+        if (adminStatus) {
+          router.replace("/admin-panel");
+        } else {
+          setError(`Access Denied: ${currentUser.email} is not listed as an administrator.`);
+        }
+      } else {
+        setUser(null);
+        setIsAdmin(false);
+      }
+    });
+
+    return () => unsubscribe();
   }, [router]);
 
   const signInWithGoogle = async () => {
