@@ -203,6 +203,10 @@ body::-webkit-scrollbar {
   animation: liquid-pulse 3.5s ease-in-out infinite;
 }
 
+.animate-liquid-wave-1 {
+  animation: liquid-wave 3.5s infinite linear;
+}
+
 .animate-liquid-wave-2 {
   animation: liquid-wave 4.5s infinite linear reverse;
 }
