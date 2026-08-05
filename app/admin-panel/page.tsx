@@ -12,7 +12,7 @@ import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, Search, Eye, EyeOff, Brain } from "lucide-react";
+import { ChevronDown, Search, Eye, EyeOff, Brain, Dices, UserCheck, Sparkles } from "lucide-react";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { quizData, QuizQuestion } from "@/quizcontent/data";
 
@@ -118,6 +118,12 @@ export default function AdminDashboardPage() {
   const [editParticipantReg, setEditParticipantReg] = useState("");
   const [editParticipantScore, setEditParticipantScore] = useState(0);
   const [isSavingParticipant, setIsSavingParticipant] = useState(false);
+
+  // Random Team Selector State
+  const [selectedTeamAPlayer, setSelectedTeamAPlayer] = useState<ParticipantItem | null>(null);
+  const [selectedTeamBPlayer, setSelectedTeamBPlayer] = useState<ParticipantItem | null>(null);
+  const [isSelectingTeamA, setIsSelectingTeamA] = useState(false);
+  const [isSelectingTeamB, setIsSelectingTeamB] = useState(false);
 
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -599,6 +605,72 @@ export default function AdminDashboardPage() {
         }
       },
     });
+  }, []);
+
+  // RANDOM PLAYER SELECTOR HANDLERS FOR TEAM A AND TEAM B
+  const handlePickRandomPlayer = useCallback((team: "Team A" | "Team B") => {
+    if (participantsList.length === 0) {
+      alert("No registered participants found in the database!");
+      return;
+    }
+
+    // Exclude currently picked opposing player if applicable
+    const availablePool = participantsList.filter((p) => {
+      if (team === "Team A" && selectedTeamBPlayer) {
+        return p.id !== selectedTeamBPlayer.id;
+      }
+      if (team === "Team B" && selectedTeamAPlayer) {
+        return p.id !== selectedTeamAPlayer.id;
+      }
+      return true;
+    });
+
+    if (availablePool.length === 0) {
+      alert("No other available participants to pick from!");
+      return;
+    }
+
+    if (team === "Team A") {
+      setIsSelectingTeamA(true);
+    } else {
+      setIsSelectingTeamB(true);
+    }
+
+    // Slot machine random shuffle effect
+    let count = 0;
+    const interval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * availablePool.length);
+      const randomPicked = availablePool[randomIndex];
+      if (team === "Team A") {
+        setSelectedTeamAPlayer(randomPicked);
+      } else {
+        setSelectedTeamBPlayer(randomPicked);
+      }
+      count++;
+
+      if (count >= 15) {
+        clearInterval(interval);
+        if (team === "Team A") {
+          setIsSelectingTeamA(false);
+        } else {
+          setIsSelectingTeamB(false);
+        }
+      }
+    }, 80);
+  }, [participantsList, selectedTeamAPlayer, selectedTeamBPlayer]);
+
+  const handleAssignTeam = useCallback(async (player: ParticipantItem, teamName: "Team A" | "Team B") => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      await setDoc(
+        doc(db, "participants", player.id),
+        { team: teamName, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error assigning team:", err);
+      alert("Failed to assign team in Firestore.");
+    }
   }, []);
 
   // EVENT HANDLERS
@@ -1631,6 +1703,123 @@ export default function AdminDashboardPage() {
                   ➕ Add New Participant
                 </button>
               </div>
+
+              {/* RANDOM PLAYER DRAFT / TEAM SELECTOR CARD */}
+              <Card className="bg-gradient-to-br from-slate-950 via-slate-900 to-purple-950/40 border-purple-500/30 p-5 sm:p-6 shadow-2xl backdrop-blur-2xl relative overflow-hidden">
+                <div className="flex items-center justify-between gap-4 mb-4 pb-3 border-b border-white/[0.08]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      <Dices size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-white m-0 flex items-center gap-2">
+                        Random Player Draft <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+                      </h3>
+                      <p className="text-xs text-slate-400 font-medium m-0">
+                        Randomly select players directly from the database first for Team A, then for Team B.
+                      </p>
+                    </div>
+                  </div>
+
+                  {(selectedTeamAPlayer || selectedTeamBPlayer) && (
+                    <button
+                      onClick={() => {
+                        setSelectedTeamAPlayer(null);
+                        setSelectedTeamBPlayer(null);
+                      }}
+                      className="text-xs font-bold text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 transition-colors"
+                    >
+                      Clear Picked Players
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* TEAM A PICK SLOT */}
+                  <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 relative flex flex-col justify-between space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 font-black text-xs px-3 py-1">
+                        ⚔️ TEAM A SLOT
+                      </Badge>
+                      <button
+                        onClick={() => handlePickRandomPlayer("Team A")}
+                        disabled={isSelectingTeamA || participantsList.length === 0}
+                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Dices size={14} className={isSelectingTeamA ? "animate-spin" : ""} />
+                        {isSelectingTeamA ? "Picking Player..." : "Pick Player for Team A"}
+                      </button>
+                    </div>
+
+                    <div className="min-h-[76px] flex items-center justify-center p-3 rounded-xl bg-slate-950/70 border border-purple-500/20 text-center">
+                      {selectedTeamAPlayer ? (
+                        <div className="space-y-1">
+                          <h4 className="text-base font-black text-white m-0">{selectedTeamAPlayer.fullName || selectedTeamAPlayer.name}</h4>
+                          <span className="text-xs font-mono text-purple-300 font-bold block">
+                            Reg #: {selectedTeamAPlayer.registrationNumber || selectedTeamAPlayer.id}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold block">
+                            Score: ⭐ {selectedTeamAPlayer.totalScore || 0} PTS
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 font-semibold m-0">No player selected for Team A yet. Click button to spin & pick.</p>
+                      )}
+                    </div>
+
+                    {selectedTeamAPlayer && (
+                      <button
+                        onClick={() => handleAssignTeam(selectedTeamAPlayer, "Team A")}
+                        className="w-full py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <UserCheck size={14} /> Assign {selectedTeamAPlayer.fullName?.split(" ")[0]} to Team A in DB
+                      </button>
+                    )}
+                  </div>
+
+                  {/* TEAM B PICK SLOT */}
+                  <div className="p-4 rounded-2xl bg-sky-950/20 border border-sky-500/30 relative flex flex-col justify-between space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/40 font-black text-xs px-3 py-1">
+                        🛡️ TEAM B SLOT
+                      </Badge>
+                      <button
+                        onClick={() => handlePickRandomPlayer("Team B")}
+                        disabled={isSelectingTeamB || participantsList.length === 0}
+                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white font-black text-xs shadow-lg shadow-sky-600/30 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Dices size={14} className={isSelectingTeamB ? "animate-spin" : ""} />
+                        {isSelectingTeamB ? "Picking Player..." : "Pick Player for Team B"}
+                      </button>
+                    </div>
+
+                    <div className="min-h-[76px] flex items-center justify-center p-3 rounded-xl bg-slate-950/70 border border-sky-500/20 text-center">
+                      {selectedTeamBPlayer ? (
+                        <div className="space-y-1">
+                          <h4 className="text-base font-black text-white m-0">{selectedTeamBPlayer.fullName || selectedTeamBPlayer.name}</h4>
+                          <span className="text-xs font-mono text-sky-300 font-bold block">
+                            Reg #: {selectedTeamBPlayer.registrationNumber || selectedTeamBPlayer.id}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold block">
+                            Score: ⭐ {selectedTeamBPlayer.totalScore || 0} PTS
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-500 font-semibold m-0">No player selected for Team B yet. Click button to spin & pick.</p>
+                      )}
+                    </div>
+
+                    {selectedTeamBPlayer && (
+                      <button
+                        onClick={() => handleAssignTeam(selectedTeamBPlayer, "Team B")}
+                        className="w-full py-2 rounded-xl bg-sky-600/30 hover:bg-sky-600/50 border border-sky-500/40 text-sky-200 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <UserCheck size={14} /> Assign {selectedTeamBPlayer.fullName?.split(" ")[0]} to Team B in DB
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Card>
 
               {/* Search Bar */}
               <div className="relative">
