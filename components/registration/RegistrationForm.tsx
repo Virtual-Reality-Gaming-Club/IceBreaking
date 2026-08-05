@@ -13,11 +13,29 @@ export function RegistrationForm() {
   const confettiRef = useRef<ConfettiRef>(null);
   const [fullName, setFullName] = useState("");
   const [regNumber, setRegNumber] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState<"Team A" | "Team B" | "">("");
+  const [isTeamLockedFromUrl, setIsTeamLockedFromUrl] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [regError, setRegError] = useState<string | undefined>(undefined);
-  const [registeredUser, setRegisteredUser] = useState<{ fullName: string; registrationNumber: string; isExisting?: boolean } | null>(null);
+  const [teamError, setTeamError] = useState<string | undefined>(undefined);
+  const [registeredUser, setRegisteredUser] = useState<{ fullName: string; registrationNumber: string; team?: string; isExisting?: boolean } | null>(null);
+
+  // Check URL parameters for pre-selected team (e.g. /register?team=a or /register?team=b)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const teamParam = params.get("team")?.toLowerCase();
+      if (teamParam === "a" || teamParam === "teama" || teamParam === "team-a") {
+        setSelectedTeam("Team A");
+        setIsTeamLockedFromUrl(true);
+      } else if (teamParam === "b" || teamParam === "teamb" || teamParam === "team-b") {
+        setSelectedTeam("Team B");
+        setIsTeamLockedFromUrl(true);
+      }
+    }
+  }, []);
 
   // Trigger confetti when registered for the first time
   useEffect(() => {
@@ -41,6 +59,7 @@ export function RegistrationForm() {
     setError(null);
     setNameError(undefined);
     setRegError(undefined);
+    setTeamError(undefined);
 
     const normalizedName = normalizeName(fullName);
     const normalizedReg = normalizeRegNumber(regNumber);
@@ -54,6 +73,10 @@ export function RegistrationForm() {
       setRegError(`Invalid format. Must be like '${regExample}'.`);
       hasError = true;
     }
+    if (!selectedTeam) {
+      setTeamError("Please select either Team A or Team B.");
+      hasError = true;
+    }
     if (hasError) return;
 
     setIsSubmitting(true);
@@ -64,15 +87,24 @@ export function RegistrationForm() {
 
       if (docSnap.exists()) {
         const existingData = docSnap.data();
+        // User cannot change team upon selection if already registered
+        const assignedTeam = existingData.team || selectedTeam;
         setRegisteredUser({
           fullName: existingData.fullName || normalizedName,
           registrationNumber: normalizedReg,
+          team: assignedTeam,
           isExisting: true,
         });
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ib_reg_number", normalizedReg);
+          localStorage.setItem("ib_full_name", existingData.fullName || normalizedName);
+          localStorage.setItem("ib_team", assignedTeam);
+        }
       } else {
         await setDoc(participantRef, {
           registrationNumber: normalizedReg,
           fullName: normalizedName,
+          team: selectedTeam,
           totalScore: 0,
           registeredAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -81,6 +113,7 @@ export function RegistrationForm() {
         setRegisteredUser({
           fullName: normalizedName,
           registrationNumber: normalizedReg,
+          team: selectedTeam,
           isExisting: false,
         });
 
@@ -96,12 +129,13 @@ export function RegistrationForm() {
         } catch (confettiErr) {
           console.error("Confetti launch error:", confettiErr);
         }
-      }
 
-      // Save to local storage for quick retrieval and user session persistence
-      if (typeof window !== "undefined") {
-        localStorage.setItem("ib_reg_number", normalizedReg);
-        localStorage.setItem("ib_full_name", normalizedName);
+        // Save to local storage for quick retrieval and user session persistence
+        if (typeof window !== "undefined") {
+          localStorage.setItem("ib_reg_number", normalizedReg);
+          localStorage.setItem("ib_full_name", normalizedName);
+          localStorage.setItem("ib_team", selectedTeam);
+        }
       }
     } catch (err: any) {
       console.error("Firestore Registration Error:", err);
@@ -128,7 +162,7 @@ export function RegistrationForm() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "24px",
+          gap: "20px",
           boxShadow: "0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(124, 58, 237, 0.2)",
           position: "relative",
           overflow: "hidden",
@@ -164,6 +198,26 @@ export function RegistrationForm() {
             {registeredUser.isExisting ? `Welcome back, ${registeredUser.fullName}.` : `Welcome, ${registeredUser.fullName}.`}
           </p>
         </div>
+
+        {registeredUser.team && (
+          <div
+            style={{
+              background: registeredUser.team === "Team A" ? "rgba(124, 58, 237, 0.15)" : "rgba(14, 165, 233, 0.15)",
+              border: registeredUser.team === "Team A" ? "1px solid rgba(167, 139, 250, 0.4)" : "1px solid rgba(56, 189, 248, 0.4)",
+              borderRadius: "14px",
+              padding: "12px 24px",
+              width: "100%",
+              boxShadow: "0 4px 15px rgba(0, 0, 0, 0.3)",
+            }}
+          >
+            <span style={{ fontSize: "0.75rem", color: "#94a3b8", display: "block", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px", fontWeight: 700 }}>
+              Assigned Squad (Permanent)
+            </span>
+            <span style={{ fontSize: "1.2rem", fontWeight: 900, color: registeredUser.team === "Team A" ? "#c084fc" : "#38bdf8", letterSpacing: "0.04em" }}>
+              {registeredUser.team === "Team A" ? "⚔️ Team A" : "🛡️ Team B"}
+            </span>
+          </div>
+        )}
 
         <div
           style={{
@@ -203,7 +257,12 @@ export function RegistrationForm() {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => setRegisteredUser(null)}
+            onClick={() => {
+              setRegisteredUser(null);
+              setSelectedTeam("");
+              setFullName("");
+              setRegNumber("");
+            }}
             style={{
               width: "100%",
               padding: "12px",
@@ -222,7 +281,7 @@ export function RegistrationForm() {
   return (
     <div style={{ width: "100%", maxWidth: "448px", margin: "0 auto" }}>
       {error && (
-        <div style={{ marginBottom: "24px", padding: "12px 16px", borderRadius: "12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#fca5a5", fontSize: "0.9rem" }}>
+        <div style={{ marginBottom: "20px", padding: "12px 16px", borderRadius: "12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.4)", color: "#fca5a5", fontSize: "0.9rem" }}>
           {error}
         </div>
       )}
@@ -232,7 +291,7 @@ export function RegistrationForm() {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: "24px",
+          gap: "20px",
           backgroundColor: "rgba(10, 13, 24, 0.92)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
@@ -278,16 +337,103 @@ export function RegistrationForm() {
             autoCapitalize="characters"
             style={{ textTransform: "uppercase", width: "100%" }}
           />
-          <p style={{ marginTop: "8px", fontSize: "0.82rem", color: "#94a3b8" }}>
+          <p style={{ marginTop: "6px", fontSize: "0.82rem", color: "#94a3b8" }}>
             Your official VIT Bhopal Registration Number.
           </p>
+        </div>
+
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+            <label style={{ display: "block", fontSize: "0.92rem", fontWeight: 700, color: "#f1f5f9", letterSpacing: "0.01em" }}>
+              Select Team
+            </label>
+            {isTeamLockedFromUrl && (
+              <span style={{ fontSize: "0.75rem", background: "rgba(124, 58, 237, 0.2)", border: "1px solid rgba(167, 139, 250, 0.4)", color: "#e9d5ff", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                🔒 Pre-selected via QR
+              </span>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <button
+              type="button"
+              disabled={isTeamLockedFromUrl}
+              onClick={() => {
+                if (isTeamLockedFromUrl) return;
+                setSelectedTeam("Team A");
+                setTeamError(undefined);
+              }}
+              style={{
+                padding: "16px 12px",
+                borderRadius: "14px",
+                background: selectedTeam === "Team A"
+                  ? "linear-gradient(135deg, rgba(124, 58, 237, 0.45) 0%, rgba(79, 70, 229, 0.45) 100%)"
+                  : "rgba(255, 255, 255, 0.03)",
+                border: selectedTeam === "Team A"
+                  ? "2px solid #c084fc"
+                  : "1px solid rgba(255, 255, 255, 0.12)",
+                color: "#ffffff",
+                cursor: isTeamLockedFromUrl ? "not-allowed" : "pointer",
+                opacity: isTeamLockedFromUrl && selectedTeam !== "Team A" ? 0.4 : 1,
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow: selectedTeam === "Team A" ? "0 0 20px rgba(167, 139, 250, 0.35)" : "none",
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>⚔️</span>
+              <span style={{ fontSize: "0.98rem", fontWeight: 800, color: selectedTeam === "Team A" ? "#ffffff" : "#cbd5e1" }}>
+                Team A
+              </span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isTeamLockedFromUrl}
+              onClick={() => {
+                if (isTeamLockedFromUrl) return;
+                setSelectedTeam("Team B");
+                setTeamError(undefined);
+              }}
+              style={{
+                padding: "16px 12px",
+                borderRadius: "14px",
+                background: selectedTeam === "Team B"
+                  ? "linear-gradient(135deg, rgba(14, 165, 233, 0.45) 0%, rgba(59, 130, 246, 0.45) 100%)"
+                  : "rgba(255, 255, 255, 0.03)",
+                border: selectedTeam === "Team B"
+                  ? "2px solid #38bdf8"
+                  : "1px solid rgba(255, 255, 255, 0.12)",
+                color: "#ffffff",
+                cursor: isTeamLockedFromUrl ? "not-allowed" : "pointer",
+                opacity: isTeamLockedFromUrl && selectedTeam !== "Team B" ? 0.4 : 1,
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                boxShadow: selectedTeam === "Team B" ? "0 0 20px rgba(56, 189, 248, 0.35)" : "none",
+              }}
+            >
+              <span style={{ fontSize: "1.2rem" }}>🛡️</span>
+              <span style={{ fontSize: "0.98rem", fontWeight: 800, color: selectedTeam === "Team B" ? "#ffffff" : "#cbd5e1" }}>
+                Team B
+              </span>
+            </button>
+          </div>
+          {teamError && (
+            <p style={{ color: "#fca5a5", fontSize: "0.82rem", marginTop: "6px", fontWeight: 600 }}>
+              {teamError}
+            </p>
+          )}
         </div>
 
         <Button
           type="submit"
           variant="primary"
           isLoading={isSubmitting}
-          disabled={isSubmitting || !fullName || !regNumber}
+          disabled={isSubmitting || !fullName || !regNumber || !selectedTeam}
           style={{ width: "100%", padding: "14px", fontSize: "1rem", fontWeight: 700, borderRadius: "12px", marginTop: "4px" }}
         >
           {isSubmitting ? "Registering..." : "Register Now"}

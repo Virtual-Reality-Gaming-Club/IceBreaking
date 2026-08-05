@@ -12,6 +12,7 @@ export async function seedFirestore() {
       {
         registrationNumber: "25BCY10001",
         fullName: "Abhinav Mishra",
+        team: "Team A",
         totalScore: 50,
         registeredAt: now,
         updatedAt: now,

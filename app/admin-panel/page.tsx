@@ -54,6 +54,7 @@ interface ParticipantItem {
   name?: string;
   email?: string;
   role?: string;
+  team?: string;
   totalScore?: number;
   registeredAt?: any;
 }
@@ -1493,7 +1494,14 @@ export default function AdminDashboardPage() {
                           className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-colors gap-3"
                         >
                           <div>
-                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">{pName}</h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">{pName}</h4>
+                              {u.team && (
+                                <Badge className={u.team === "Team A" ? "bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px]" : "bg-sky-500/20 text-sky-300 border-sky-500/40 text-[10px]"}>
+                                  {u.team}
+                                </Badge>
+                              )}
+                            </div>
                             <span className="text-[11px] sm:text-xs font-mono text-violet-400 font-semibold block mt-0.5">
                               Reg #: {pReg}
                             </span>

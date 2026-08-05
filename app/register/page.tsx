@@ -40,10 +40,10 @@ export default function RegisterPage() {
   }, []);
 
   return (
-    <div style={{ height: "100dvh", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", position: "relative", overflowY: "auto" }}>
       <PublicNavbar />
 
-      <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 20px", width: "100%", maxWidth: "896px", margin: "0 auto", position: "relative", zIndex: 10 }}>
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "100px 20px 40px", width: "100%", maxWidth: "896px", margin: "0 auto", position: "relative", zIndex: 10 }}>
         <div className="animate-fade-in-up" style={{ textAlign: "center", marginBottom: "20px" }}>
           <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 2.5rem)", fontWeight: 800, color: "white", margin: "0 0 8px 0" }}>
             Event <span className="text-gradient-primary">Registration</span>
