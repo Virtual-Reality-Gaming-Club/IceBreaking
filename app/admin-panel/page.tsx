@@ -378,12 +378,21 @@ export default function AdminDashboardPage() {
     setExpandedDetails((prev) => ({ ...prev, [qId]: !prev[qId] }));
   }, []);
 
-  // Map participant reg number to full name for analytics
+  // Map participant reg number to full name & team for analytics
   const participantMap = useMemo(() => {
     const map: { [regNum: string]: string } = {};
     participantsList.forEach((p) => {
       const reg = (p.registrationNumber || p.id || "").toUpperCase();
       map[reg] = p.fullName || p.name || reg;
+    });
+    return map;
+  }, [participantsList]);
+
+  const participantTeamMap = useMemo(() => {
+    const map: { [regNum: string]: string } = {};
+    participantsList.forEach((p) => {
+      const reg = (p.registrationNumber || p.id || "").toUpperCase();
+      if (p.team) map[reg] = p.team;
     });
     return map;
   }, [participantsList]);
@@ -976,6 +985,57 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
+          {/* LEADERBOARD TAB */}
+          {activeTab === "leaderboard" && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight m-0">Live Standings Leaderboard</h1>
+                  <p className="text-slate-400 text-xs font-semibold mt-1">
+                    Realtime participant rankings with assigned team breakdown.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white/[0.02] border border-white/[0.08] rounded-3xl p-4 sm:p-6 backdrop-blur-2xl shadow-xl space-y-3">
+                {participantsList
+                  .slice()
+                  .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
+                  .map((u, idx) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-colors gap-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center font-black text-xs text-purple-300">
+                          #{idx + 1}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug">
+                              {u.fullName || u.name || "Participant"}
+                            </h4>
+                            {u.team && (
+                              <Badge className={u.team === "Team A" ? "bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px]" : "bg-sky-500/20 text-sky-300 border-sky-500/40 text-[10px]"}>
+                                {u.team}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-[11px] sm:text-xs font-mono text-violet-400 font-semibold block mt-0.5">
+                            Reg #: {u.registrationNumber || u.id}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Badge className="bg-sky-500/15 text-sky-300 border-sky-500/30 font-black text-xs px-3 py-1">
+                        ⭐ {u.totalScore || 0} PTS
+                      </Badge>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* EVENTS TAB */}
           {activeTab === "events" && (
             <div className="space-y-6">
@@ -1111,6 +1171,28 @@ export default function AdminDashboardPage() {
                                 {poll.status === "active" ? "🟢 Active Poll" : "🔴 Closed"}
                               </Badge>
                               <span className="text-xs text-slate-400 font-bold">Total Votes: {totalVotes}</span>
+                              {(() => {
+                                let sumA = 0;
+                                let sumB = 0;
+                                poll.options?.forEach((o: any) => {
+                                  sumA += o.teamVotes?.["Team A"] || 0;
+                                  sumB += o.teamVotes?.["Team B"] || 0;
+                                });
+                                const grandTotal = sumA + sumB;
+                                if (grandTotal === 0) return null;
+                                const pA = Math.round((sumA / grandTotal) * 100);
+                                const pB = Math.round((sumB / grandTotal) * 100);
+                                return (
+                                  <div className="flex items-center gap-1.5 ml-2">
+                                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 font-bold text-[10px] px-2 py-0.5">
+                                      ⚔️ Team A: {pA}% ({sumA})
+                                    </Badge>
+                                    <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/40 font-bold text-[10px] px-2 py-0.5">
+                                      🛡️ Team B: {pB}% ({sumB})
+                                    </Badge>
+                                  </div>
+                                );
+                              })()}
                             </div>
                             <h3 className="m-0 text-base sm:text-xl font-black text-white">{poll.question}</h3>
                           </div>
@@ -1160,16 +1242,66 @@ export default function AdminDashboardPage() {
                                     {votes} votes ({percentage}%)
                                   </span>
                                 </div>
-                                <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06]">
-                                  <div
-                                    className={`h-full bg-gradient-to-r ${currentGradient} rounded-full origin-left`}
-                                    style={{
-                                      transform: `scaleX(${percentage / 100})`,
-                                      transition: "transform 700ms ease-out",
-                                      willChange: "transform",
-                                    }}
-                                  />
+                                <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06] flex w-full relative">
+                                  {(() => {
+                                    const tA = opt.teamVotes?.["Team A"] || 0;
+                                    const tB = opt.teamVotes?.["Team B"] || 0;
+                                    const sumTeam = tA + tB;
+                                    const pA = sumTeam > 0 ? Math.round((tA / sumTeam) * 100) : 0;
+                                    const pB = sumTeam > 0 ? Math.round((tB / sumTeam) * 100) : 0;
+
+                                    if (sumTeam > 0 && percentage > 0) {
+                                      return (
+                                        <>
+                                          {pA > 0 && (
+                                            <div
+                                              className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-l-full transition-[width] duration-700 ease-out"
+                                              style={{ width: `${(pA / 100) * percentage}%` }}
+                                            />
+                                          )}
+                                          {pB > 0 && (
+                                            <div
+                                              className={`h-full bg-gradient-to-r from-sky-500 to-blue-600 ${pA === 0 ? "rounded-l-full" : ""} rounded-r-full transition-[width] duration-700 ease-out`}
+                                              style={{ width: `${(pB / 100) * percentage}%` }}
+                                            />
+                                          )}
+                                        </>
+                                      );
+                                    }
+                                    return (
+                                      <div
+                                        className={`h-full bg-gradient-to-r ${currentGradient} rounded-full transition-[width] duration-700 ease-out`}
+                                        style={{
+                                          width: `${percentage}%`,
+                                        }}
+                                      />
+                                    );
+                                  })()}
                                 </div>
+
+                                {/* Team Vote Breakdown Badges with Percentages */}
+                                {((opt.teamVotes?.["Team A"] || 0) > 0 || (opt.teamVotes?.["Team B"] || 0) > 0) && (() => {
+                                  const tA = opt.teamVotes?.["Team A"] || 0;
+                                  const tB = opt.teamVotes?.["Team B"] || 0;
+                                  const total = tA + tB;
+                                  const pA = total > 0 ? Math.round((tA / total) * 100) : 0;
+                                  const pB = total > 0 ? Math.round((tB / total) * 100) : 0;
+                                  return (
+                                    <div className="flex items-center gap-2 mt-2 text-[11px]">
+                                      <span className="text-slate-400 font-medium">Team Distribution:</span>
+                                      {tA > 0 && (
+                                        <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] px-2 py-0">
+                                          ⚔️ Team A: {pA}% ({tA})
+                                        </Badge>
+                                      )}
+                                      {tB > 0 && (
+                                        <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/40 text-[10px] px-2 py-0">
+                                          🛡️ Team B: {pB}% ({tB})
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             );
                           })}
@@ -1401,6 +1533,39 @@ export default function AdminDashboardPage() {
                                   }}
                                 />
                               </div>
+
+                              {/* Team Vote Share Breakdown */}
+                              {(() => {
+                                let tA = 0;
+                                let tB = 0;
+                                responseEntries.forEach(([regNum, selectedIdx]) => {
+                                  if (selectedIdx === optIdx) {
+                                    const team = participantTeamMap[regNum.toUpperCase()];
+                                    if (team === "Team A") tA++;
+                                    else if (team === "Team B") tB++;
+                                  }
+                                });
+                                const teamTotal = tA + tB;
+                                if (teamTotal === 0) return null;
+                                const pA = Math.round((tA / teamTotal) * 100);
+                                const pB = Math.round((tB / teamTotal) * 100);
+
+                                return (
+                                  <div className="flex items-center gap-2 mt-2 text-[11px]">
+                                    <span className="text-slate-400 font-medium">Team Share:</span>
+                                    {tA > 0 && (
+                                      <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 text-[10px] px-2 py-0">
+                                        ⚔️ Team A: {pA}% ({tA})
+                                      </Badge>
+                                    )}
+                                    {tB > 0 && (
+                                      <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/40 text-[10px] px-2 py-0">
+                                        🛡️ Team B: {pB}% ({tB})
+                                      </Badge>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })}

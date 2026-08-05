@@ -35,6 +35,7 @@ interface PollOption {
   id: string;
   text: string;
   votes: number;
+  teamVotes?: { [team: string]: number };
 }
 
 interface PollItem {
@@ -49,6 +50,7 @@ interface ParticipantItem {
   id: string;
   registrationNumber: string;
   fullName: string;
+  team?: string;
   totalScore?: number;
 }
 
@@ -60,17 +62,46 @@ const BAR_GRADIENTS = [
   "from-purple-500 via-fuchsia-500 to-pink-400",
 ] as const;
 
-function PollBar({ pct, gradientClass }: { pct: number; gradientClass: string }) {
+function PollBar({
+  teamAPct,
+  teamBPct,
+  totalPct,
+  gradientClass,
+}: {
+  teamAPct: number;
+  teamBPct: number;
+  totalPct: number;
+  gradientClass: string;
+}) {
+  const hasTeamSplit = (teamAPct > 0 || teamBPct > 0) && totalPct > 0;
+
   return (
-    <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06]">
-      <div
-        className={`h-full bg-gradient-to-r ${gradientClass} rounded-full origin-left`}
-        style={{
-          transform: `scaleX(${pct / 100})`,
-          transition: "transform 700ms ease-out",
-          willChange: "transform",
-        }}
-      />
+    <div className="h-3 rounded-full bg-slate-950/80 overflow-hidden border border-white/[0.06] flex w-full relative">
+      {hasTeamSplit ? (
+        <>
+          {teamAPct > 0 && (
+            <div
+              className="h-full bg-gradient-to-r from-purple-600 to-indigo-500 rounded-l-full transition-[width] duration-700 ease-out"
+              style={{ width: `${(teamAPct / 100) * totalPct}%` }}
+              title={`Team A: ${teamAPct}%`}
+            />
+          )}
+          {teamBPct > 0 && (
+            <div
+              className={`h-full bg-gradient-to-r from-sky-500 to-blue-600 ${teamAPct === 0 ? "rounded-l-full" : ""} rounded-r-full transition-[width] duration-700 ease-out`}
+              style={{ width: `${(teamBPct / 100) * totalPct}%` }}
+              title={`Team B: ${teamBPct}%`}
+            />
+          )}
+        </>
+      ) : (
+        <div
+          className={`h-full bg-gradient-to-r ${gradientClass} rounded-full transition-[width] duration-700 ease-out`}
+          style={{
+            width: `${totalPct}%`,
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -135,6 +166,7 @@ export default function UserPanelPage() {
           id: d.id,
           registrationNumber: d.id,
           fullName: data.fullName || "Participant",
+          team: data.team || undefined,
           totalScore: Number(data.totalScore) || 0,
         });
       });
@@ -300,12 +332,35 @@ export default function UserPanelPage() {
     if (selectedIdx === undefined || userVotes[pollId]) return;
 
     try {
+      let userTeam = "";
+      if (typeof window !== "undefined") {
+        userTeam = localStorage.getItem("ib_team") || "";
+      }
+      if (!userTeam && regNumber) {
+        const pSnap = await getDoc(doc(db, "participants", regNumber));
+        if (pSnap.exists()) {
+          userTeam = pSnap.data()?.team || "";
+        }
+      }
+
       setPolls((prevPolls) => {
         const poll = prevPolls.find((p) => p.id === pollId);
         if (!poll) return prevPolls;
-        const updatedOptions = poll.options.map((opt, idx) =>
-          idx === selectedIdx ? { ...opt, votes: (opt.votes || 0) + 1 } : opt
-        );
+        const updatedOptions = poll.options.map((opt, idx) => {
+          if (idx === selectedIdx) {
+            const currentTeamVotes = opt.teamVotes || {};
+            const nextTeamCount = userTeam ? (currentTeamVotes[userTeam] || 0) + 1 : (currentTeamVotes["Unassigned"] || 0) + 1;
+            return {
+              ...opt,
+              votes: (opt.votes || 0) + 1,
+              teamVotes: {
+                ...currentTeamVotes,
+                [userTeam || "Unassigned"]: nextTeamCount,
+              },
+            };
+          }
+          return opt;
+        });
         updateDoc(doc(db, "polls", pollId), { options: updatedOptions }).catch(console.error);
         return prevPolls;
       });
@@ -313,7 +368,7 @@ export default function UserPanelPage() {
     } catch (err) {
       console.error("Error submitting poll answer:", err);
     }
-  }, [selectedOptions, userVotes, polls]);
+  }, [selectedOptions, userVotes, polls, regNumber]);
 
   const handleSelectOption = useCallback((pollId: string, optIdx: number) => {
     setSelectedOptions((prev) => ({ ...prev, [pollId]: optIdx }));
@@ -603,11 +658,40 @@ export default function UserPanelPage() {
 
                               {hasVoted ? (
                                 <div className="space-y-3 mt-4 pt-3 border-t border-white/[0.08]">
+                                  {/* Overall Poll Team Turnout Summary */}
+                                  {(() => {
+                                    let totalTeamA = 0;
+                                    let totalTeamB = 0;
+                                    poll.options.forEach((o) => {
+                                      totalTeamA += o.teamVotes?.["Team A"] || 0;
+                                      totalTeamB += o.teamVotes?.["Team B"] || 0;
+                                    });
+                                    const sumTeams = totalTeamA + totalTeamB;
+                                    if (sumTeams === 0) return null;
+                                    const teamAPct = Math.round((totalTeamA / sumTeams) * 100);
+                                    const teamBPct = Math.round((totalTeamB / sumTeams) * 100);
+
+                                    return (
+                                      <div className="p-3 rounded-xl bg-slate-900/90 border border-violet-500/20 mb-4 flex items-center justify-between gap-2 flex-wrap">
+                                        <span className="text-xs font-bold text-slate-300">Poll Squad Turnout:</span>
+                                        <div className="flex items-center gap-2 text-xs">
+                                          <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/40 font-extrabold px-2.5 py-1">
+                                            ⚔️ Team A: {teamAPct}% ({totalTeamA})
+                                          </Badge>
+                                          <Badge className="bg-sky-500/20 text-sky-300 border-sky-500/40 font-extrabold px-2.5 py-1">
+                                            🛡️ Team B: {teamBPct}% ({totalTeamB})
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                   {poll.options.map((opt, optIdx) => {
                                     const count = opt.votes || 0;
                                     const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
                                     const isMyChoice = userVotedOptionId === opt.id;
                                     const gradientClass = BAR_GRADIENTS[optIdx % BAR_GRADIENTS.length];
+                                    const teamAVotes = opt.teamVotes?.["Team A"] || 0;
+                                    const teamBVotes = opt.teamVotes?.["Team B"] || 0;
 
                                     return (
                                       <div
@@ -632,7 +716,41 @@ export default function UserPanelPage() {
                                           </span>
                                           <span className="text-sky-400 font-black shrink-0">{pct}% ({count})</span>
                                         </div>
-                                        <PollBar pct={pct} gradientClass={gradientClass} />
+                                        {(() => {
+                                          const teamTotal = teamAVotes + teamBVotes;
+                                          const teamAPct = teamTotal > 0 ? Math.round((teamAVotes / teamTotal) * 100) : 0;
+                                          const teamBPct = teamTotal > 0 ? Math.round((teamBVotes / teamTotal) * 100) : 0;
+                                          return (
+                                            <PollBar
+                                              teamAPct={teamAPct}
+                                              teamBPct={teamBPct}
+                                              totalPct={pct}
+                                              gradientClass={gradientClass}
+                                            />
+                                          );
+                                        })()}
+
+                                        {/* Team Vote Distribution Breakdown with Percentages */}
+                                        {(teamAVotes > 0 || teamBVotes > 0) && (() => {
+                                          const teamTotal = teamAVotes + teamBVotes;
+                                          const teamAPct = teamTotal > 0 ? Math.round((teamAVotes / teamTotal) * 100) : 0;
+                                          const teamBPct = teamTotal > 0 ? Math.round((teamBVotes / teamTotal) * 100) : 0;
+                                          return (
+                                            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/[0.05] text-[10px]">
+                                              <span className="text-slate-400 font-semibold">Team Share:</span>
+                                              {teamAVotes > 0 && (
+                                                <span className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
+                                                  ⚔️ Team A: {teamAPct}% ({teamAVotes})
+                                                </span>
+                                              )}
+                                              {teamBVotes > 0 && (
+                                                <span className="px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold">
+                                                  🛡️ Team B: {teamBPct}% ({teamBVotes})
+                                                </span>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     );
                                   })}

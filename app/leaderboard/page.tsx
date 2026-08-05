@@ -16,6 +16,7 @@ interface ParticipantItem {
   id: string;
   registrationNumber: string;
   fullName: string;
+  team?: string;
   totalScore?: number;
 }
 
@@ -38,6 +39,7 @@ export default function PublicLeaderboardPage() {
           id: docSnap.id,
           registrationNumber: docSnap.id,
           fullName: data.fullName || "Participant",
+          team: data.team || undefined,
           totalScore: Number(data.totalScore) || 0,
         });
       });
@@ -197,7 +199,12 @@ export default function PublicLeaderboardPage() {
                       🥈 #2
                     </div>
                     <h3 className="text-[10px] sm:text-lg font-black text-white mb-0.5 tracking-tight line-clamp-1 break-all sm:break-normal w-full">{top2.fullName}</h3>
-                    <span className="text-[8px] sm:text-xs font-mono text-slate-400 font-bold mb-1.5 sm:mb-4 truncate max-w-full">{top2.registrationNumber}</span>
+                    <span className="text-[8px] sm:text-xs font-mono text-slate-400 font-bold mb-1 sm:mb-2 truncate max-w-full">{top2.registrationNumber}</span>
+                    {top2.team && (
+                      <Badge className={top2.team === "Team A" ? "bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5" : "bg-sky-500/20 text-sky-300 border-sky-500/40 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5"}>
+                        {top2.team}
+                      </Badge>
+                    )}
                     <Badge className="bg-slate-300/15 text-slate-200 border-slate-300/40 font-black text-[9px] sm:text-xs px-1.5 sm:px-4 py-0.5 sm:py-1.5 backdrop-blur-md">
                       {top2.totalScore || 0} PTS
                     </Badge>
@@ -214,7 +221,12 @@ export default function PublicLeaderboardPage() {
                     👑 #1
                   </div>
                   <h3 className="text-xs sm:text-xl font-black text-amber-200 mb-0.5 tracking-tight line-clamp-1 break-all sm:break-normal w-full">{top1.fullName}</h3>
-                  <span className="text-[8px] sm:text-xs font-mono text-amber-400/80 font-bold mb-1.5 sm:mb-4 truncate max-w-full">{top1.registrationNumber}</span>
+                  <span className="text-[8px] sm:text-xs font-mono text-amber-400/80 font-bold mb-1 sm:mb-2 truncate max-w-full">{top1.registrationNumber}</span>
+                  {top1.team && (
+                    <Badge className={top1.team === "Team A" ? "bg-purple-500/30 text-purple-200 border-purple-400/50 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5 font-extrabold" : "bg-sky-500/30 text-sky-200 border-sky-400/50 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5 font-extrabold"}>
+                      {top1.team}
+                    </Badge>
+                  )}
                   <Badge className="bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 border-amber-300 font-black text-[10px] sm:text-sm px-2 sm:px-5 py-0.5 sm:py-1.5 shadow-lg shadow-amber-400/20">
                     {top1.totalScore || 0} PTS
                   </Badge>
@@ -227,7 +239,12 @@ export default function PublicLeaderboardPage() {
                       🥉 #3
                     </div>
                     <h3 className="text-[10px] sm:text-lg font-black text-white mb-0.5 tracking-tight line-clamp-1 break-all sm:break-normal w-full">{top3.fullName}</h3>
-                    <span className="text-[8px] sm:text-xs font-mono text-amber-600/80 font-bold mb-1.5 sm:mb-4 truncate max-w-full">{top3.registrationNumber}</span>
+                    <span className="text-[8px] sm:text-xs font-mono text-amber-600/80 font-bold mb-1 sm:mb-2 truncate max-w-full">{top3.registrationNumber}</span>
+                    {top3.team && (
+                      <Badge className={top3.team === "Team A" ? "bg-purple-500/20 text-purple-300 border-purple-500/40 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5" : "bg-sky-500/20 text-sky-300 border-sky-500/40 text-[8px] sm:text-[10px] px-2 py-0.5 mb-1.5"}>
+                        {top3.team}
+                      </Badge>
+                    )}
                     <Badge className="bg-amber-700/20 text-amber-300 border-amber-700/40 font-black text-[9px] sm:text-xs px-1.5 sm:px-4 py-0.5 sm:py-1.5 backdrop-blur-md">
                       {top3.totalScore || 0} PTS
                     </Badge>
@@ -255,9 +272,16 @@ export default function PublicLeaderboardPage() {
                             #{actualRank}
                           </div>
                           <div>
-                            <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug group-hover:text-violet-200 transition-colors">
-                              {item.fullName}
-                            </h4>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm sm:text-base font-bold text-white m-0 leading-snug group-hover:text-violet-200 transition-colors">
+                                {item.fullName}
+                              </h4>
+                              {item.team && (
+                                <Badge className={item.team === "Team A" ? "bg-purple-500/20 text-purple-300 border-purple-500/40 text-[9px] px-2 py-0" : "bg-sky-500/20 text-sky-300 border-sky-500/40 text-[9px] px-2 py-0"}>
+                                  {item.team}
+                                </Badge>
+                              )}
+                            </div>
                             <span className="text-xs font-mono text-violet-400/90 font-semibold block mt-0.5">
                               {item.registrationNumber}
                             </span>
