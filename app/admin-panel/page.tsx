@@ -12,7 +12,7 @@ import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, Search, Eye, EyeOff, Brain, Dices, UserCheck, Sparkles } from "lucide-react";
+import { ChevronDown, Search, Eye, EyeOff, Brain, Dices, UserCheck, Sparkles, Trash2 } from "lucide-react";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { quizData, QuizQuestion } from "@/quizcontent/data";
 
@@ -380,6 +380,54 @@ export default function AdminDashboardPage() {
     }
   }, []);
 
+  const handleResetQuizResponses = useCallback(() => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Reset All Quiz Answers to 0?",
+      description: (
+        <div>
+          <p className="text-rose-300 font-bold mb-2">⚠️ RESET ALL QUIZ RESPONSES:</p>
+          <p>
+            This action will permanently delete all submitted participant answers across all 15 trivia questions in the <code className="text-violet-300">quiz_responses</code> collection.
+          </p>
+          <p className="text-xs text-slate-400 font-semibold pt-2">
+            Real-time analytics and answer tallies will be reset to 0. Proceed?
+          </p>
+        </div>
+      ),
+      confirmLabel: "Reset All Quiz Answers",
+      onConfirm: async () => {
+        try {
+          const { collection, getDocs, doc, writeBatch } = await import("firebase/firestore");
+          const qSnap = await getDocs(collection(db, "quiz_responses"));
+          
+          if (qSnap.empty) {
+            alert("No quiz answers found in database to reset.");
+            return;
+          }
+
+          let qBatch = writeBatch(db);
+          let qCount = 0;
+          qSnap.docs.forEach((d) => {
+            qBatch.delete(doc(db, "quiz_responses", d.id));
+            qCount++;
+            if (qCount % 400 === 0) {
+              qBatch.commit();
+              qBatch = writeBatch(db);
+            }
+          });
+          if (qCount % 400 !== 0) await qBatch.commit();
+
+          setQuizResponses({});
+          alert("✅ Successfully reset all quiz answers to 0!");
+        } catch (err: any) {
+          console.error("Error resetting quiz answers:", err);
+          alert(`❌ Failed to reset quiz responses: ${err.message}`);
+        }
+      },
+    });
+  }, []);
+
   const toggleExpandDetails = useCallback((qId: number) => {
     setExpandedDetails((prev) => ({ ...prev, [qId]: !prev[qId] }));
   }, []);
@@ -505,6 +553,55 @@ export default function AdminDashboardPage() {
           await deleteDoc(doc(db, "polls", poll.id));
         } catch (err) {
           console.error("Error deleting poll:", err);
+        }
+      },
+    });
+  }, []);
+
+  const handleResetAllPollVotes = useCallback(() => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Reset All Poll Votes to 0?",
+      description: (
+        <div>
+          <p className="text-rose-300 font-bold mb-2">⚠️ RESET ALL LIVE POLL VOTES:</p>
+          <p>
+            This action will reset the vote counts and team vote percentages across all active and saved polls in the <code className="text-violet-300">polls</code> collection to 0.
+          </p>
+          <p className="text-xs text-slate-400 font-semibold pt-2">
+            All option vote tallies will be cleared. Proceed?
+          </p>
+        </div>
+      ),
+      confirmLabel: "Reset All Poll Votes",
+      onConfirm: async () => {
+        try {
+          const { collection, getDocs, doc, setDoc } = await import("firebase/firestore");
+          const pollSnap = await getDocs(collection(db, "polls"));
+
+          if (pollSnap.empty) {
+            alert("No active polls found in database to reset.");
+            return;
+          }
+
+          for (const pollDoc of pollSnap.docs) {
+            const data = pollDoc.data();
+            const resetOptions = (data.options || []).map((opt: any) => ({
+              ...opt,
+              votes: 0,
+              teamVotes: { "Team A": 0, "Team B": 0 },
+            }));
+            await setDoc(
+              doc(db, "polls", pollDoc.id),
+              { options: resetOptions, totalVotes: 0, updatedAt: new Date().toISOString() },
+              { merge: true }
+            );
+          }
+
+          alert("✅ Successfully reset all poll votes to 0!");
+        } catch (err: any) {
+          console.error("Error resetting poll votes:", err);
+          alert(`❌ Failed to reset poll votes: ${err.message}`);
         }
       },
     });
@@ -1210,12 +1307,21 @@ export default function AdminDashboardPage() {
                     Create, edit, toggle active status, or delete audience polls.
                   </p>
                 </div>
-                <button
-                  onClick={() => handleOpenPollModal()}
-                  className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer min-h-[44px]"
-                >
-                  ➕ Create New Poll
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleResetAllPollVotes}
+                    className="px-3.5 py-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 min-h-[44px]"
+                  >
+                    <Trash2 size={14} />
+                    Reset All Poll Votes
+                  </button>
+                  <button
+                    onClick={() => handleOpenPollModal()}
+                    className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-colors shadow-lg flex items-center justify-center gap-2 self-start sm:self-auto cursor-pointer min-h-[44px]"
+                  >
+                    ➕ Create New Poll
+                  </button>
+                </div>
               </div>
 
               <div className="grid gap-4">
@@ -1419,9 +1525,16 @@ export default function AdminDashboardPage() {
                   </button>
                   <button
                     onClick={handleDeactivateAllQuestions}
-                    className="px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
+                    className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
                   >
                     🛑 Deactivate All
+                  </button>
+                  <button
+                    onClick={handleResetQuizResponses}
+                    className="px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 min-h-[40px]"
+                  >
+                    <Trash2 size={14} />
+                    Reset All Answers
                   </button>
                 </div>
               </div>
