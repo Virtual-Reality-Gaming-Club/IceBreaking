@@ -711,21 +711,28 @@ export default function AdminDashboardPage() {
       return;
     }
 
-    // Exclude currently picked opposing player if applicable
+    // Filter available pool:
+    // 1. Exclude the currently picked player in either slot so no player is chosen twice
+    // 2. Exclude players already assigned to the opposite team in DB
     const availablePool = participantsList.filter((p) => {
-      if (team === "Team A" && selectedTeamBPlayer) {
-        return p.id !== selectedTeamBPlayer.id;
-      }
-      if (team === "Team B" && selectedTeamAPlayer) {
-        return p.id !== selectedTeamAPlayer.id;
-      }
+      if (selectedTeamAPlayer && p.id === selectedTeamAPlayer.id) return false;
+      if (selectedTeamBPlayer && p.id === selectedTeamBPlayer.id) return false;
+
+      // If participant has a team assigned in DB, make sure it's not the opposite team
+      const oppositeTeam = team === "Team A" ? "Team B" : "Team A";
+      if (p.team && p.team === oppositeTeam) return false;
+
       return true;
     });
 
     if (availablePool.length === 0) {
-      alert("No other available participants to pick from!");
+      alert(`No unassigned participants available for ${team}!`);
       return;
     }
+
+    // Pick final player upfront so shuffle ends on a guaranteed valid unique player
+    const finalIndex = Math.floor(Math.random() * availablePool.length);
+    const finalPicked = availablePool[finalIndex];
 
     if (team === "Team A") {
       setIsSelectingTeamA(true);
@@ -736,21 +743,23 @@ export default function AdminDashboardPage() {
     // Slot machine random shuffle effect
     let count = 0;
     const interval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * availablePool.length);
-      const randomPicked = availablePool[randomIndex];
-      if (team === "Team A") {
-        setSelectedTeamAPlayer(randomPicked);
-      } else {
-        setSelectedTeamBPlayer(randomPicked);
-      }
       count++;
-
       if (count >= 15) {
         clearInterval(interval);
         if (team === "Team A") {
+          setSelectedTeamAPlayer(finalPicked);
           setIsSelectingTeamA(false);
         } else {
+          setSelectedTeamBPlayer(finalPicked);
           setIsSelectingTeamB(false);
+        }
+      } else {
+        const randomIndex = Math.floor(Math.random() * availablePool.length);
+        const randomPicked = availablePool[randomIndex];
+        if (team === "Team A") {
+          setSelectedTeamAPlayer(randomPicked);
+        } else {
+          setSelectedTeamBPlayer(randomPicked);
         }
       }
     }, 80);
