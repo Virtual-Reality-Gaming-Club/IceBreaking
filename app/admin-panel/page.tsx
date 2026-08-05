@@ -4,14 +4,14 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { checkIsAdmin, getAllAdmins, AdminUser } from "@/lib/adminAuth";
 import dynamic from "next/dynamic";
 import { collection, onSnapshot, doc } from "firebase/firestore";
 import Image from "next/image";
-import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronDown, Search, Eye, EyeOff, Brain } from "lucide-react";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { quizData, QuizQuestion } from "@/quizcontent/data";
@@ -76,7 +76,7 @@ export default function AdminDashboardPage() {
   const [pollsList, setPollsList] = useState<any[]>([]);
   const [eventsList, setEventsList] = useState<EventItem[]>([]);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "admins" | "tools"
+    "overview" | "leaderboard" | "events" | "polls" | "quizzes" | "users" | "tools"
   >("overview");
 
   // Participant list pagination & search
@@ -130,7 +130,7 @@ export default function AdminDashboardPage() {
     title: "",
     description: "",
     confirmLabel: "Delete",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   // Auth verification
@@ -752,21 +752,41 @@ export default function AdminDashboardPage() {
         </Link>
 
         <div className="flex items-center gap-2 sm:gap-5">
+          {/* User Profile Avatar & Info */}
           <div className="flex items-center gap-2 sm:gap-3 bg-[#0f1423]/60 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border border-violet-500/25">
             <Avatar className="w-7 h-7 sm:w-10 sm:h-10">
-              <AvatarFallback className="bg-gradient-to-br from-violet-600 to-indigo-900 text-white font-black text-xs sm:text-base border border-violet-400/30">
-                {user.email?.charAt(0).toUpperCase() || "A"}
+              <AvatarImage
+                src={user?.photoURL || undefined}
+                alt={user?.displayName || "Admin Avatar"}
+              />
+              <AvatarFallback className="bg-violet-900 text-violet-200 font-bold text-xs sm:text-base">
+                {(user?.displayName || user?.email || "A").charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="hidden sm:block text-left">
-              <span className="block text-xs font-bold text-slate-200 truncate max-w-[140px]">
-                {user.email}
-              </span>
-              <span className="block text-[10px] font-black text-emerald-400 uppercase tracking-wider">
-                👑 Superadmin
-              </span>
+
+            <div className="text-left hidden xs:block sm:block">
+              <p className="m-0 text-xs sm:text-sm font-extrabold text-slate-100 leading-tight">
+                {user?.displayName
+                  ? user.displayName.replace(/\b[0-9]{2}[A-Za-z]{3}[0-9]{5}\b/gi, "").trim()
+                  : "Admin User"}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-bold text-[10px] px-1.5 py-0">
+                  👑 Superadmin
+                </Badge>
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={async () => {
+              await signOut(auth);
+              router.push("/admin-panel/login");
+            }}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold bg-red-500/15 text-red-300 border border-red-500/30 rounded-xl cursor-pointer hover:bg-red-500/30 hover:text-white transition-all shadow-sm"
+          >
+            🚪 Sign Out
+          </button>
         </div>
       </header>
 
@@ -796,7 +816,6 @@ export default function AdminDashboardPage() {
                 <option value="polls">📊 Manage Polls</option>
                 <option value="quizzes">🧠 Live Quiz Control</option>
                 <option value="users">👥 Participants</option>
-                <option value="admins">🛡️ Admin Roster</option>
                 <option value="tools">⚙️ Database Tools</option>
               </select>
               <ChevronDown
@@ -814,7 +833,6 @@ export default function AdminDashboardPage() {
               { id: "polls", label: "📊 Manage Polls" },
               { id: "quizzes", label: "🧠 Live Quiz Control" },
               { id: "users", label: "👥 Participants" },
-              { id: "admins", label: "🛡️ Admin Roster" },
               { id: "tools", label: "⚙️ Database Tools" },
             ].map((item) => {
               const isActive = activeTab === item.id;
@@ -828,11 +846,10 @@ export default function AdminDashboardPage() {
                       setActiveTab(item.id as any);
                     }
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-between min-h-[44px] ${
-                    isActive
-                      ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white"
-                      : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
-                  }`}
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-xs font-bold transition-colors cursor-pointer flex items-center justify-between min-h-[44px] ${isActive
+                    ? "bg-gradient-to-r from-violet-600/30 to-indigo-600/20 border border-violet-400/40 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.04] border border-transparent"
+                    }`}
                 >
                   <span>{item.label}</span>
                   {isActive && <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />}
@@ -856,30 +873,20 @@ export default function AdminDashboardPage() {
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div>
-              <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.02em" }}>
-                Dashboard Overview
-              </h1>
+              <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px", letterSpacing: "-0.02em" }}>Dashboard Overview</h1>
               <p style={{ color: "#94a3b8", fontSize: "0.98rem", marginBottom: "36px" }}>
                 Real-time operational metrics & platform controls for IceBreaking 2026.
               </p>
 
-              {/* Control Banner */}
-              <Card
-                className={`${
-                  registrationOpen ? "bg-emerald-950/20 border-emerald-500/30" : "bg-red-950/20 border-red-500/30"
-                } shadow-xl mb-8 border backdrop-blur-xl`}
-              >
+              {/* Event Registration Status Control Banner */}
+              <Card className={`${registrationOpen ? "bg-emerald-950/20 border-emerald-500/30" : "bg-red-950/20 border-red-500/30"} shadow-xl mb-8 border backdrop-blur-xl`}>
                 <CardContent className="p-6 flex flex-row items-center justify-between flex-wrap gap-4">
                   <div>
                     <div className="flex items-center gap-3 mb-1.5">
-                      <span className="text-base font-black text-white">📝 Event Registration Status:</span>
-                      <Badge
-                        className={
-                          registrationOpen
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold px-3 py-0.5 text-xs"
-                            : "bg-red-500/20 text-red-300 border-red-500/40 font-bold px-3 py-0.5 text-xs"
-                        }
-                      >
+                      <span className="text-base font-black text-white">
+                        📝 Event Registration Status:
+                      </span>
+                      <Badge className={registrationOpen ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold px-3 py-0.5 text-xs" : "bg-red-500/20 text-red-300 border-red-500/40 font-bold px-3 py-0.5 text-xs"}>
                         {registrationOpen ? "🟢 OPEN (Public Can Register)" : "🔒 CLOSED (Registration Locked)"}
                       </Badge>
                     </div>
@@ -892,9 +899,7 @@ export default function AdminDashboardPage() {
 
                   <button
                     onClick={handleToggleRegistration}
-                    className={`px-5 py-2.5 rounded-xl font-black text-xs transition-colors shadow-lg text-white cursor-pointer min-h-[44px] ${
-                      registrationOpen ? "bg-red-600 hover:bg-red-500" : "bg-emerald-600 hover:bg-emerald-500"
-                    }`}
+                    className={`px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-lg text-white ${registrationOpen ? "bg-red-600 hover:bg-red-500 shadow-red-600/30" : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30"}`}
                   >
                     {registrationOpen ? "🔒 Close Registration" : "🟢 Open Registration"}
                   </button>
@@ -902,56 +907,71 @@ export default function AdminDashboardPage() {
               </Card>
 
               {/* Metrics Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-5 mb-6">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "22px", marginBottom: "40px" }}>
                 {[
-                  {
-                    label: "Participants",
-                    value: stats.totalUsers || participantsList.length,
-                    color: "#818cf8",
-                    accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
-                  },
-                  {
-                    label: "Active Events",
-                    value: eventsList.length,
-                    color: "#38bdf8",
-                    accent: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-                  },
-                  {
-                    label: "Active Polls",
-                    value: pollsList.length,
-                    color: "#fbbf24",
-                    accent: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-                  },
-                  {
-                    label: "Admins",
-                    value: stats.activeAdmins || 2,
-                    color: "#34d399",
-                    accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-                  },
+                  { label: "Total Participants", value: stats.totalUsers || participantsList.length, color: "#818cf8", accent: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30" },
+                  { label: "Active Events", value: eventsList.length, color: "#38bdf8", accent: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
+                  { label: "Active Polls", value: pollsList.length, color: "#fbbf24", accent: "bg-amber-500/15 text-amber-300 border-amber-500/30" },
+                  { label: "Active Quizzes", value: quizData.length, color: "#c084fc", accent: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+                  { label: "System Admins", value: stats.activeAdmins || 2, color: "#34d399", accent: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
                 ].map((card, idx) => (
-                  <Card
-                    key={idx}
-                    className="bg-white/[0.02] border-white/[0.08] backdrop-blur-2xl transition-colors hover:border-violet-400/50 p-3 sm:p-5 flex flex-col justify-between"
-                  >
-                    <div>
-                      <CardDescription className="text-slate-400 font-bold text-[9px] sm:text-xs uppercase tracking-wider truncate mb-0.5">
-                        {card.label}
-                      </CardDescription>
-                      <CardTitle className="text-xl sm:text-3xl font-black text-white" style={{ color: card.color }}>
+                  <Card key={idx} className="bg-white/[0.02] border-white/[0.08] shadow-[0_0_30px_rgba(0,0,0,0.3)] backdrop-blur-2xl relative overflow-hidden transition-all duration-300 hover:border-violet-400/50 hover:shadow-[0_0_25px_rgba(139,92,246,0.15)] ring-1 ring-white/[0.04]">
+                    <CardHeader className="pb-2">
+                      <CardDescription className="text-slate-400 font-bold text-xs uppercase tracking-wider">{card.label}</CardDescription>
+                      <CardTitle className="text-3xl font-black text-white" style={{ color: card.color }}>
                         {card.value}
                       </CardTitle>
-                    </div>
-                    <div className="mt-1 sm:mt-2">
-                      <Badge
-                        variant="outline"
-                        className={`${card.accent} font-bold text-[8px] sm:text-[11px] px-1.5 py-0 sm:py-0.5 whitespace-nowrap`}
-                      >
-                        Live Data
+                    </CardHeader>
+                    <CardContent className="pt-0 pb-4">
+                      <Badge variant="outline" className={`${card.accent} font-bold text-[11px] px-2.5 py-0.5`}>
+                        Live System Data
                       </Badge>
-                    </div>
+                    </CardContent>
                   </Card>
                 ))}
               </div>
+
+              {/* Registered System Admins Box */}
+              <Card className="bg-white/[0.02] border-white/[0.08] shadow-2xl p-6 backdrop-blur-2xl ring-1 ring-white/[0.04]">
+                <CardHeader className="px-0 pt-0 pb-6 border-b border-white/[0.08] flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-xl font-black text-white">Registered Superadmins</CardTitle>
+                    <CardDescription className="text-slate-400 mt-1 text-sm">Verified administrator roster with full system privileges.</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="bg-violet-500/15 text-violet-300 border-violet-500/40 px-3.5 py-1 font-bold text-xs">
+                    🛡️ 2 Active Admins
+                  </Badge>
+                </CardHeader>
+
+                <CardContent className="px-0 pt-6">
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "20px" }}>
+                    {[
+                      { name: "Jaiyansh Dhaulakhandi", role: "Superadmin", initial: "J", bg: "from-violet-600 to-indigo-900" },
+                      { name: "Abhinav Mishra", role: "Superadmin", initial: "A", bg: "from-blue-600 to-indigo-900" },
+                    ].map((admin, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-400/40 transition-all shadow-lg backdrop-blur-md"
+                      >
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-10 h-10">
+                            <AvatarFallback className={`bg-gradient-to-br ${admin.bg} text-white font-black text-lg border border-white/20`}>
+                              {admin.initial}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <strong className="text-base font-black text-white block">{admin.name}</strong>
+                          </div>
+                        </div>
+
+                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 font-extrabold px-3 py-1 text-xs">
+                          👑 {admin.role}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
@@ -1221,21 +1241,19 @@ export default function AdminDashboardPage() {
                     <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800">
                       <button
                         onClick={() => handleSetQuizMode("single")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                          quizMode === "single"
-                            ? "bg-purple-600 text-white shadow-md"
-                            : "text-slate-400 hover:text-slate-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${quizMode === "single"
+                          ? "bg-purple-600 text-white shadow-md"
+                          : "text-slate-400 hover:text-slate-200"
+                          }`}
                       >
                         Single Question Mode
                       </button>
                       <button
                         onClick={() => handleSetQuizMode("multiple")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-                          quizMode === "multiple"
-                            ? "bg-purple-600 text-white shadow-md"
-                            : "text-slate-400 hover:text-slate-200"
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${quizMode === "multiple"
+                          ? "bg-purple-600 text-white shadow-md"
+                          : "text-slate-400 hover:text-slate-200"
+                          }`}
                       >
                         Multiple Active Mode
                       </button>
@@ -1243,11 +1261,10 @@ export default function AdminDashboardPage() {
 
                     <button
                       onClick={handleToggleGlobalQuiz}
-                      className={`px-5 py-2.5 rounded-xl font-black text-xs transition-colors shadow-lg cursor-pointer min-h-[40px] ${
-                        globalQuizOpen
-                          ? "bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800"
-                          : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white"
-                      }`}
+                      className={`px-5 py-2.5 rounded-xl font-black text-xs transition-colors shadow-lg cursor-pointer min-h-[40px] ${globalQuizOpen
+                        ? "bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800"
+                        : "bg-gradient-to-r from-emerald-600 to-teal-600 text-white"
+                        }`}
                     >
                       {globalQuizOpen ? "🔒 Lock Quiz Arena" : "🔓 Open Quiz Arena"}
                     </button>
@@ -1278,9 +1295,8 @@ export default function AdminDashboardPage() {
                   return (
                     <Card
                       key={q.id}
-                      className={`bg-slate-950/80 backdrop-blur-xl transition-colors p-5 sm:p-6 border ${
-                        isActive ? "border-purple-500/50 ring-1 ring-purple-500/20" : "border-slate-800/80 opacity-90"
-                      }`}
+                      className={`bg-slate-950/80 backdrop-blur-xl transition-colors p-5 sm:p-6 border ${isActive ? "border-purple-500/50 ring-1 ring-purple-500/20" : "border-slate-800/80 opacity-90"
+                        }`}
                     >
                       {/* Top Header */}
                       <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
@@ -1304,11 +1320,10 @@ export default function AdminDashboardPage() {
                         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap shrink-0">
                           <button
                             onClick={() => handleToggleQuestionActive(q.id)}
-                            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-bold text-xs transition-colors text-center cursor-pointer min-h-[44px] ${
-                              isActive
-                                ? "bg-slate-900 border border-slate-800 hover:border-slate-700 text-rose-300"
-                                : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30"
-                            }`}
+                            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-bold text-xs transition-colors text-center cursor-pointer min-h-[44px] ${isActive
+                              ? "bg-slate-900 border border-slate-800 hover:border-slate-700 text-rose-300"
+                              : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30"
+                              }`}
                           >
                             {isActive ? "🛑 Deactivate Q#" + q.id : "⚡ Activate Q#" + q.id}
                           </button>
@@ -1346,11 +1361,10 @@ export default function AdminDashboardPage() {
                           return (
                             <div
                               key={optIdx}
-                              className={`p-3 rounded-2xl border transition-colors ${
-                                isCorrect
-                                  ? "bg-emerald-950/20 border-emerald-500/40"
-                                  : "bg-slate-900/60 border-white/[0.06]"
-                              }`}
+                              className={`p-3 rounded-2xl border transition-colors ${isCorrect
+                                ? "bg-emerald-950/20 border-emerald-500/40"
+                                : "bg-slate-900/60 border-white/[0.06]"
+                                }`}
                             >
                               <div className="flex justify-between items-center text-xs font-bold mb-1.5 gap-2 flex-wrap">
                                 <span className="text-white flex items-center gap-2 min-w-0">
@@ -1521,49 +1535,6 @@ export default function AdminDashboardPage() {
                     </button>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* ADMINS TAB */}
-          {activeTab === "admins" && (
-            <div>
-              <h1 style={{ fontSize: "1.8rem", fontWeight: 800, marginBottom: "8px" }}>System Administrators</h1>
-              <p style={{ color: "#94a3b8", fontSize: "0.95rem", marginBottom: "32px" }}>Authorized accounts with administrative access.</p>
-
-              <div style={{ display: "grid", gap: "16px" }}>
-                <div
-                  style={{
-                    padding: "20px",
-                    background: "rgba(124, 58, 237, 0.1)",
-                    border: "1px solid rgba(124, 58, 237, 0.3)",
-                    borderRadius: "14px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Jaiyansh</h4>
-                  </div>
-                  <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
-                </div>
-                <div
-                  style={{
-                    padding: "20px",
-                    background: "rgba(124, 58, 237, 0.1)",
-                    border: "1px solid rgba(124, 58, 237, 0.3)",
-                    borderRadius: "14px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>Abhinav</h4>
-                  </div>
-                  <span style={{ color: "#22c55e", fontWeight: 700, fontSize: "0.85rem" }}>Superadmin</span>
-                </div>
               </div>
             </div>
           )}

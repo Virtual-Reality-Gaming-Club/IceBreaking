@@ -16,10 +16,28 @@ export default function HomePage() {
   const [regNumber, setRegNumber] = useState<string | null>(null);
   const [registrationOpen, setRegistrationOpen] = useState<boolean>(false);
 
-  // Check localStorage session & realtime registration status
+  // Verify stored session against Firestore participants collection
   useEffect(() => {
+    let isMounted = true;
     try {
-      setRegNumber(localStorage.getItem("ib_reg_number"));
+      const storedReg = localStorage.getItem("ib_reg_number");
+      if (storedReg) {
+        const normalized = storedReg.trim().toUpperCase();
+        const { getDoc, doc } = require("firebase/firestore");
+        getDoc(doc(db, "participants", normalized)).then((docSnap: any) => {
+          if (!isMounted) return;
+          if (docSnap.exists()) {
+            setRegNumber(normalized);
+          } else {
+            // Participant record does not exist in Firebase, clear invalid cached credentials
+            localStorage.removeItem("ib_reg_number");
+            localStorage.removeItem("ib_full_name");
+            setRegNumber(null);
+          }
+        }).catch(() => {
+          if (isMounted) setRegNumber(null);
+        });
+      }
     } catch {
       // ignore
     }
@@ -32,7 +50,10 @@ export default function HomePage() {
       }
     });
 
-    return () => unsub();
+    return () => {
+      isMounted = false;
+      unsub();
+    };
   }, []);
 
   return (

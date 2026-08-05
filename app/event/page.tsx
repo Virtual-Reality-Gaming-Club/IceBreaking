@@ -152,6 +152,14 @@ export default function UserPanelPage() {
           if (!fullNameRef.current && list[idx].fullName) {
             setFullName(list[idx].fullName);
           }
+        } else {
+          // Participant record was deleted or does not exist in Firebase
+          try {
+            localStorage.removeItem("ib_reg_number");
+            localStorage.removeItem("ib_full_name");
+          } catch {}
+          setRegNumber("");
+          setFullName("");
         }
       }
     });
