@@ -12,7 +12,7 @@ import Image from "next/image";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, Search, Eye, EyeOff, Brain, Dices, UserCheck, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Eye, EyeOff, Brain, Dices, UserCheck, Sparkles, Trash2 } from "lucide-react";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { quizData, QuizQuestion } from "@/quizcontent/data";
 
@@ -325,7 +325,7 @@ export default function AdminDashboardPage() {
   const handleToggleQuestionActive = useCallback(async (qId: number) => {
     try {
       const { doc, setDoc } = await import("firebase/firestore");
-      let newActive: number[];
+      let newActive: number[] = [];
       if (quizMode === "single") {
         newActive = activeQuestionIds.includes(qId) ? [] : [qId];
       } else {
@@ -345,6 +345,40 @@ export default function AdminDashboardPage() {
       console.error("Error toggling question active status:", err);
     }
   }, [quizMode, activeQuestionIds]);
+
+  // NEXT QUESTION HANDLER: Enforces Single Question Mode, closes previous & opens next question
+  const handleNextQuestion = useCallback(async () => {
+    try {
+      const { doc, setDoc } = await import("firebase/firestore");
+      let nextId = 1;
+
+      if (activeQuestionIds.length > 0) {
+        const currentId = activeQuestionIds[0];
+        const currentIndex = quizData.findIndex((q) => q.id === currentId);
+        if (currentIndex !== -1 && currentIndex < quizData.length - 1) {
+          nextId = quizData[currentIndex + 1].id;
+        } else if (currentIndex === quizData.length - 1) {
+          nextId = quizData[0].id; // Loop back to Question #1 if at the end
+        } else {
+          nextId = quizData[0].id;
+        }
+      } else {
+        nextId = quizData[0].id;
+      }
+
+      await setDoc(
+        doc(db, "settings", "quiz"),
+        {
+          mode: "single",
+          activeQuestionIds: [nextId],
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error("Error advancing to next question:", err);
+    }
+  }, [activeQuestionIds]);
 
   const handleActivateAllQuestions = useCallback(async () => {
     try {
@@ -1527,6 +1561,13 @@ export default function AdminDashboardPage() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <button
+                    onClick={handleNextQuestion}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center gap-1.5 cursor-pointer min-h-[40px]"
+                  >
+                    <span>Next Question</span>
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
                     onClick={handleActivateAllQuestions}
                     className="px-3.5 py-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 font-bold text-xs transition-colors cursor-pointer min-h-[40px]"
                   >
@@ -1549,8 +1590,38 @@ export default function AdminDashboardPage() {
               </div>
 
               {/* GLOBAL QUIZ CONTROLS & MODE SELECTOR */}
-              <Card className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl p-5 sm:p-6">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <Card className="bg-slate-950/80 border-slate-800/80 shadow-xl backdrop-blur-xl p-5 sm:p-6 space-y-4">
+                {/* PROMINENT LIVE QUESTION INDICATOR BOX */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/40 to-slate-950 border border-purple-500/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-600/30 border border-purple-500/50 flex items-center justify-center text-purple-300 font-black text-xl shadow-lg shadow-purple-600/20 shrink-0">
+                      {activeQuestionIds.length > 0 ? `#${activeQuestionIds[0]}` : "—"}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs uppercase tracking-wider font-extrabold text-purple-400">Current Live Question:</span>
+                        <Badge className={activeQuestionIds.length > 0 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px]" : "bg-slate-800 text-slate-400 border-slate-700 text-[10px]"}>
+                          {activeQuestionIds.length > 0 ? "🟢 LIVE ON SCREENS" : "⚪ NO QUESTION ACTIVE"}
+                        </Badge>
+                      </div>
+                      <h4 className="text-sm sm:text-base font-black text-white m-0 mt-0.5">
+                        {activeQuestionIds.length > 0
+                          ? quizData.find((q) => q.id === activeQuestionIds[0])?.question || `Question #${activeQuestionIds[0]}`
+                          : "No active question selected. Click 'Next Question' or activate a question below."}
+                      </h4>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleNextQuestion}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs transition-all shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 cursor-pointer shrink-0 min-h-[44px]"
+                  >
+                    <span>Next Question</span>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pt-1">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-black text-white">Global Arena Quiz Switch:</span>
