@@ -821,9 +821,6 @@ export default function UserPanelPage() {
                               <Card key={q.id} className="bg-white/[0.02] p-4 sm:p-6 border-purple-400/25 shadow-[0_4px_30px_rgba(0,0,0,0.2)] backdrop-blur-2xl ring-1 ring-white/[0.04]">
                                 <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                                   <div className="flex items-center gap-2">
-                                    <Badge className="bg-purple-500/15 text-purple-300 border-purple-500/30 font-bold text-xs">
-                                      Question #{q.id}
-                                    </Badge>
                                     <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 font-bold text-xs">
                                       🏆 {q.points || 1} PTS
                                     </Badge>
@@ -885,7 +882,7 @@ export default function UserPanelPage() {
                                     disabled={currentSelectedIdx === undefined}
                                     className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs shadow-lg shadow-purple-600/30 transition-opacity cursor-pointer disabled:opacity-40 min-h-[48px]"
                                   >
-                                    Submit Answer for Q#{q.id}
+                                    Submit Answer
                                   </button>
                                 )}
                               </Card>
